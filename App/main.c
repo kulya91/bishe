@@ -183,7 +183,7 @@ uint8 Daolu_WaodaoV = 0 ;
 
 uint8 QieHuan_Flag = 0 ;
 /***********************************************坡道模块*******************************************/
-uint8 podao_Flag  = 0 ;
+
 
 /*******************************超声波避障模块*********************************/
 
@@ -236,6 +236,7 @@ void PIT0_IRQHandler2();
 void lcd_camera_init();                                                            //LCD初始化
 void lcd_display();                                                                //LCD显示
 
+void QieHuan();
 
 void duoji();                                                                     //摄像头舵机
 void duoji_V();                                                                   //电磁舵机
@@ -249,10 +250,10 @@ void dianji_Left_disu();
 void dianji_Right_disu();
 void disu_duoji();
 
+void dianjihuang();
 void dianji_7_2();
 void dianji_Left_7_2();
 void dianji_Right_7_2();
-
 
 
 void tiqianCL();                                                                  //提前分析赛道
@@ -264,30 +265,9 @@ void shizi();                                                                   
 void shizi1();                                                                    //十字判断
 void shizi2();                                                                    //十字判断
 
-void huandao1L();                                                                 // 入左环道第一标志判断
-void huandao2_1_L();                                                              //入左环道第二标志判断
-void huandao2_1_R();                                                              //入右环道第二标志判断
-void huandao1CL();                                                                //出左第一环道判断
-void huandao1CR();                                                                //出右第一环道判断
-
-void Clear_hud_FlagLC();                                                          //清第二次左圆环标志
-void Clear_hud_FlagRC();                                                          //清第二次右圆环标志
-void Clear_hud_FlagL();                                                           //清第一次左圆环标志
-void Clear_hud_FlagR();                                                           //清第一次左圆环标志
-void hudaoRL(uint8 hudao_XF , uint8 hudao_SF);                                    //求左环道斜率
-void hudaoRR(uint8 hudao_XF , uint8 hudao_SF);                                    //求右环道斜率
-
-
-void huandao2C();                                                                 //出第二环道判断
-
-void QieHuan();                                                                   //识别切换
-void Ch_Sh_Bo();                                                                  //超声波开关
-void podao();                                                                     //坡道
 
 
 void GetVoltage();                                                                //获取电压
-void Dianci_YuHU();                                                               //电磁圆环识别
-void Dianci_Daolu();
 
 int GYH(int AD_max,int AD_min,int value);                                        //归一化
 
@@ -328,12 +308,19 @@ void lcd_display()
   LCD_num_C(site1,y,FCOLOUR,BCOLOUR);
   site1.y=100;
   LCD_num_C(site1,z,FCOLOUR,BCOLOUR);
-  
 
-  
-  
 }
 
+/***************************salted_fish电机驱动**********************************/
+void dianjihuang()
+{
+  //right
+      FTM_CnV_REG(FTMN[FTM0],MOTOR4_PWM)=0;
+      FTM_CnV_REG(FTMN[FTM0],MOTOR1_PWM)=2200;
+      //left
+      FTM_CnV_REG(FTMN[FTM0],MOTOR2_PWM)=0;
+      FTM_CnV_REG(FTMN[FTM0],MOTOR3_PWM)=2200;
+}
 /*****************************主函数*********************************************/
 
 void  main(void)
@@ -416,7 +403,7 @@ void  main(void)
   }
 }
 
-
+/********************************编码器，电机，清中断************************************************/
 void PIT0_IRQHandler2()
 {
   static uint8 js = 0 ;
@@ -429,8 +416,8 @@ void PIT0_IRQHandler2()
   //Dianci_YuHU();
   //duoji_V();
   
-  dianji_7_2();
-  
+  //dianji_7_2();
+  dianjihuang();
   /*  var[0] =DIYH_flag_R;
   var[1] =DIYH_flag_L;
   var[2] = 0;
@@ -585,17 +572,13 @@ void  midline()
  // vcan_sendimg((uint8 *)imgbuff, sizeof(imgbuff));
   tiqianCL();
   QieHuan();
-  Ch_Sh_Bo();
-  podao();
+  //Ch_Sh_Bo();
+  //podao();
   daolu_fenxi();
   
   //  shizi1();
   
-  if(  hudao2RLF== 0 || hudao2RLF== 1 ) huandao2_1_L();
-  if(  hudao2RRF== 0 || hudao2RRF== 1 ) huandao2_1_R();
-  
-  if( hudao2RLF== 2 )  huandao1CL();
-  if( hudao2RRF== 2 )  huandao1CR();
+
   //  huandao1L();
   for(i=i_max;i>=i_min;i--)
   {
@@ -1151,389 +1134,6 @@ void  shizi2()
   }
 }
 
-/****************************************左环道判断入2_1_L****************************************/
-void huandao2_1_L()
-{
-  uint8 summ=0 , summ1=0 , summ2 =0 ,summ3 = 0 ,summ4 = 0 , summ5 = 0 ;
-  uint8 ii = 0 ;//jj = 0 ;
-  
-  if( hudao2RLF == 0 )
-  {
-    for( ii = 40 ; ii > 5 ; ii-- )                //限制条件                           //通过调节判断距离和范围来控制识别圆环的标志
-    {
-      if( ii >= 10 && ( mid_R_line[ii] - mid_R_line[ii-2] <= 3 && mid_R_line[ii] - mid_R_line[ii-2] >= 0  )               // 2 为限制条件
-         &&  mid_R_line[ii] <= 79 && mid_R_line[ii] >= 45 &&
-           mid_R_line[ii] - straig_Rline[ii] >= -4 && mid_R_line[ii] - straig_Rline[ii] <= 4 )               summ++;    //42为限制条件
-      
-      if( panduanR[ii] == 0 && panduanL[ii] == 1 && img[ii][2] == 0xff && ii <= 25 && ii >= 5 )
-      {
-        summ3 ++ ;
-        if( summ1 <= 2 )
-        {
-          uint8 j = 0 , jishu = 0;
-          for( j = 0 ; j < 79 ; j ++ )
-          {
-            if( img[ii][j] == 0xff )      jishu ++ ;
-            else
-            {
-              jishu = 0 ;
-              break ;
-            }
-            
-            if( jishu >= 55 )
-            {
-              jishu = 0 ;
-              summ1++;
-              break;
-            }
-          }
-        }
-      }
-      
-      if( ii <= 15 )
-      {
-        if( panduanR[ii] == 0 && panduanL[ii] == 0 && panduanR[ii - 1] == 0 && panduanL[ii - 1] == 0
-           && panduanR[ii + 1] == 0 && panduanL[ii + 1] == 1 && img[ii + 1][2] == 0xff && mid_L_line[ii] <= 30 )   summ4 = 1;
-        /*  if( summ4 == 1)
-        if( panduanR[ii] == 0 && panduanL[ii] == 0  )    summ5 ++ ;                 */
-      }
-      if( img[ii][40] == 0xff )      summ2 ++ ;
-      
-    }
-    
-    if( summ >= 22  && summ1 > 1 && summ2 >= 30 && summ3 <= 12 && summ4 == 1 )       //第一限制条件
-    {
-      summ = 0;   summ1=0;   summ2 = 0 ;
-      for(ii=25 ; ii>= 5 ; ii--)           //下半部分检测        范围很重要
-      {                                                               //&&mid_L_line[ii+3]<=mid_L_line[ii+5]
-        if( ( mid_L_line[ii] < mid_L_line[ii+2] && mid_L_line[ii + 1] < mid_L_line[ii+3] )
-           && mid_L_line[ii] <= 8 && mid_L_line[ii] >= 1 && panduanL[ii - 5] == 1 )//&& ii <= 45        // && (mid_L_line[ii] < mid_L_line[ii+2] && mid_L_line[ii+1] < mid_L_line[ii+3]))
-        {
-          if( AD_GYH_C[1][0] >= 90 ||  AD_GYH_C[2][0] >= 90 )
-          {
-            hudao2RLF = 1;
-            hudaoRL( ii + 2 , ii ) ;
-            break;
-          }
-        }
-      }
-    }
-    
-  }
-  
-  if( hudao2RLF == 1)
-  {
-    summ = 0;   summ1=0;   summ2 = 0  ; summ3 = 0 ;
-    uint8   hudao_ruwulu = 0;
-    if(img[7][40]==0xff&&img[8][40]==0xff && img[7][38]==0xff&&img[8][38]==0xff && img[7][42]==0xff&&img[8][42]==0xff)      //十行十一行中间为白  无路
-    {hudao_ruwulu=1;}       //无路不成立
-    else
-    {hudao_ruwulu=0;}       //无路成立
-    
-    /*   for( ii = 40 ; ii >= 20 ; ii -- )
-    {
-    for( jj = 70 ; jj <= 79 ; jj ++ )
-    {
-    if( img[ii][jj] == 0x00 && img[15][40] == 0x00 ) summ ++ ;
-    
-    if( summ >= 7 )
-    {
-    summ = 0 ;
-    summ1 ++ ;
-    break ;
-  }
-  }
-    summ = 0 ;
-    if( summ1 >= 12 )
-    {
-    hudao2RLF = 2 ;
-    break;
-  }                                                                                  */
-    
-    summ = 0;   summ1=0;   summ2 = 0; summ3 = 1;
-    
-    for( ii = 40 ; ii >= 20 ; ii -- )
-    {
-      if( panduanR[ii] ==  0 && panduanL[ii] ==  1 && hudao_ruwulu == 0)
-        if( mid_R_line[ii] < straig_Rline[ii] - summ3++ )                   summ ++ ;
-      if( summ >= 7 )                                                      hudao2RLF = 2 ;
-      
-      if( panduanL[ii] ==  0 && hudao_ruwulu == 0 )                       summ1 ++ ;
-      if( summ1 >= 15 )                                                    hudao2RLF = 2 ;
-    }
-    
-  }
-  
-}
-
-/****************************************右环道判断入2_1_R****************************************/
-void huandao2_1_R()
-{
-  uint8 summ =0,summ1=0, summ2 = 0 ,summ3 = 0 , summ4 = 0 ,summ5 = 0;
-  uint8 ii = 0 ;//jj = 0 ;
-  
-  if( hudao2RRF == 0 )
-  {
-    for( ii = 40 ; ii > 5 ; ii--)                   //限制条件                              //通过调节判断距离和范围来控制识别圆环的标志
-    {
-      if( ii >= 10 && ( mid_L_line[ii - 2] - mid_L_line[ii] <= 3 && mid_L_line[ii - 2] - mid_L_line[ii] >= 0 )
-         &&  mid_L_line[ii] >=1 &&  mid_L_line[ii] <= 35 &&
-           mid_L_line[ii] - straig_Lline[ii] >= -4 && mid_L_line[ii] - straig_Lline[ii] <= 4 )                               summ++;
-      
-      if( panduanL[ii] == 0 && panduanR[ii] == 1 && img[ii][78] == 0xff && ii <= 25 && ii >=5 )
-      {
-        summ3 ++ ;
-        if( summ1 <= 2 )
-        {
-          uint8 j = 79 , jishu = 0;
-          for(j = 79 ; j > 0; j -- )
-          {
-            if( img[ii][j] == 0xff )      jishu ++ ;
-            else
-            {
-              jishu = 0 ;
-              break ;
-            }
-            
-            if( jishu >= 55 )
-            {
-              jishu = 0 ;
-              summ1++;
-              break;
-            }
-          }
-        }
-      }
-      
-      if( ii <= 15 )
-      {
-        if( panduanR[ii] == 0 && panduanL[ii] == 0 && panduanR[ii - 1] == 0 && panduanL[ii - 1] == 0
-           && panduanR[ii + 1] == 1 && panduanL[ii + 1] == 0 && img[ii + 1][78] == 0xff && mid_R_line[ii] >= 50 )   summ4 = 1;
-        /*    if( summ4 == 1)
-        if( panduanR[ii] == 0 && panduanL[ii] == 0 )    summ5 ++ ;               */
-      }
-      
-      if( img[ii][40] == 0xff )      summ2 ++ ;
-      
-    }
-    
-    if(summ >= 22  && summ1 > 1 && summ2 >= 30 && summ3 <= 12 && summ4 == 1 )       //第一限制条件
-    {
-      summ = 0;   summ1=0;   summ2 = 0 ;
-      for(ii=25;ii>5;ii--)           //下半部分检测        范围很重要
-      {                                                               //&&mid_L_line[ii+3]<=mid_L_line[ii+5]
-        if( mid_R_line[ii] > mid_R_line[ii + 2] && mid_R_line[ii + 1] > mid_R_line[ii + 3]
-           && mid_R_line[ii] >= 72 && mid_R_line[ii] <= 79 && panduanR[ii - 5] == 1 )        // && (mid_L_line[ii] < mid_L_line[ii+2] && mid_L_line[ii+1] < mid_L_line[ii+3]))
-        {
-          if( AD_GYH_C[1][0] >= 90 ||  AD_GYH_C[2][0] >= 90 )
-          {
-            hudao2RRF = 1 ;
-            hudaoRR( ii + 2 , ii );
-            break ;
-          }
-        }
-      }
-    }
-  }
-  
-  if( hudao2RRF == 1 )
-  {
-    summ = 0;   summ1=0;   summ2 = 0  ; summ3 = 0 ;
-    uint8   hudao_ruwulu = 0;
-    if(img[7][40]==0xff&&img[8][40]==0xff && img[7][38]==0xff&&img[8][38]==0xff && img[7][42]==0xff&&img[8][42]==0xff)      //十行十一行中间为白  无路
-    {hudao_ruwulu=1;}       //无路不成立
-    else
-    {hudao_ruwulu=0;}       //无路成立
-    /*   for( ii = 40 ; ii >= 20 ; ii -- )
-    {
-    for( jj = 1 ; jj <= 10 ; jj ++ )
-    {
-    if( img[ii][jj] == 0x00 && img[15][40] == 0x00 ) summ ++ ;
-    
-    if( summ >= 7 )
-    {
-    summ = 0 ;
-    summ1 ++ ;
-    break ;
-  }
-  }
-    summ = 0 ; // 好的时候未清零
-    if( summ1 >= 12 )
-    {
-    hudao2RRF = 2 ;
-    break;
-  }
-  }                                           */
-    
-    summ = 0;   summ1=0;   summ2 = 0; summ3 = 1;
-    
-    for( ii = 40 ; ii >= 20 ; ii -- )
-    {
-      if( panduanL[ii] ==  0 && panduanR[ii] ==  1 && hudao_ruwulu == 0)
-        if( mid_L_line[ii] > straig_Lline[ii] + summ3++  )                 summ ++ ;
-      if( summ >= 7 )                                                     hudao2RRF = 2 ;
-      if( panduanR[ii] ==  0 && hudao_ruwulu == 0 )                        summ1 ++ ;
-      if( summ1 >= 15 )                                                   hudao2RRF = 2 ;
-    }
-    
-  }
-  
-}
-
-/****************************************出右环道第一判断*********************************************/
-void huandao1CR()
-{
-  uint8 ii=0,jj=0,hudaoC=0 ;
-  uint8 summ=0 , summ1=0 , summ2 =0 ;
-  
-  if( hudao1CRF == 1 )
-  {
-    for( ii = 40 ; ii >= 10 ; ii -- )
-    {
-      if( ( mid_L_line[ii - 2] - mid_L_line[ii] <= 3 && mid_L_line[ii - 2] - mid_L_line[ii] > 0 ) &&  mid_L_line[ii] >=2 &&  mid_L_line[ii] <= 40 )   summ++;
-      if( img[ii][40] == 0xff ) summ1 ++ ;
-      if( summ >= 20 && summ1 >= 25 )
-      {
-        hudao1CRF = 0 ;
-        hudao2RRF = 0 ;
-        break ;
-      }
-    }
-  }
-  
-  if( hudao1CRF == 0 && hudao2RRF == 2 )
-  {
-    for( ii = 40 ; ii >= 15 ;ii -- )
-    {
-      if( panduanL[ii] == 0 && mid_L_line[ii] <= 20 && mid_L_line[ii - 1] > mid_L_line[ii] )
-      {
-        summ ++ ;
-      }
-      if( summ >= 3 )      hudaoC = 1 ;
-      if( hudaoC == 1 )
-      {
-        if( panduanL[ii] == 1 && summ2 <= 2)
-        {
-          for( jj = 1 ; jj <= 79 ; jj ++ )
-          {
-            if( img[ii][jj] == 0xff )       summ1 ++ ;
-            if( summ1 >= 60 )
-            {
-              summ1 = 0 ;
-              summ2 ++ ;
-              break ;
-            }
-          }
-        }
-      }
-      if( summ2 >= 2 )
-      {
-        hudao1CRF = 1 ;
-        break ;
-      }
-    }
-  }
-}
-
-/****************************************出左环道第一判断*********************************************/
-void huandao1CL()
-{
-  uint8 ii=0,jj=2,hudaoC=0 ;
-  uint8 summ=0 , summ1=0 , summ2 =0  ;
-  
-  if( hudao1CLF == 1 )
-  {
-    for( ii = 40 ; ii >= 10 ; ii --)
-    {
-      if( ( mid_R_line[ii] - mid_R_line[ii-2] <= 3 && mid_R_line[ii] - mid_R_line[ii-2] > 0 ) &&  mid_R_line[ii] <=78  &&  mid_R_line[ii] >= 40)   summ++;
-      if( img[ii][40] == 0xff )      summ1 ++ ;
-      if( summ >= 20 && summ1 >= 25 )
-      {
-        hudao1CLF = 0 ;
-        hudao2RLF = 0 ;
-        break ;
-      }
-    }
-  }
-  
-  
-  if( hudao1CLF == 0 && hudao2RLF == 2 )
-  {
-    for( ii = 40 ; ii >= 15 ; ii --)                    //划分区域找标志
-    {
-      if( panduanR[ii] == 0 && mid_R_line[ii] >= 60 && mid_R_line[ii + 1] > mid_R_line[ii] )   //判断依据
-      {
-        summ ++ ;
-      }
-      if( summ >= 5 )   hudaoC = 1;
-      if( hudaoC == 1 )                                 //打开开关
-      {
-        if( panduanR[ii] == 1 && summ2 <= 2 )           //判断依据
-        {
-          for( jj = 79 ; jj >= 1 ; jj -- )
-          {
-            if( img[ii][jj] == 0xff )  summ1 ++ ;     //进一步判断
-            if( summ1 >= 60 )
-            {
-              summ1 = 0 ;
-              summ2 ++ ;
-              break ;
-            }
-          }
-        }
-      }
-      if( summ2 >= 2 )
-      {
-        hudao1CLF = 1 ;
-        break ;
-      }
-    }
-  }
-}
-
-/***************************************入左环岛斜率***************************************/
-void hudaoRL(uint8 hudao_XF , uint8 hudao_SF)
-{
-  huandaoLK=0.00,huandaoLB=0.00;
-  float iX=hudao_XF,iS=hudao_SF;
-  uint8  jishu=0;
-  for( ; iX <= 45 ; iX ++ )                             //从下边突变点的所在行向下寻找内环的的突变点
-  {
-    if( mid_L_line[(uint8)iX] <= mid_L_line[(uint8)iX+1] )
-    {
-      jishu++;
-    }
-    else
-    {
-      huandaoLK=( mid_L_line[(uint8)iS] - mid_L_line[(uint8)iX] )/(iS-iX);
-      huandaoLB= mid_L_line[(uint8)iS]-huandaoLK*iS;
-      break;
-    }
-  }
-}
-
-/***************************************入右环岛斜率***************************************/
-void hudaoRR(uint8 hudao_XF , uint8 hudao_SF )
-{
-  huandaoRK=0.0,huandaoRB=0.0;
-  float iX=hudao_XF,iS=hudao_SF;
-  uint8 jishu=0;
-  for( ; iX <= 45 ; iX ++ )                             //从下边突变点的所在行向下寻找内环的的突变点
-  {
-    if(mid_R_line[(uint8)iX] >= mid_R_line[(uint8)iX+1])
-    {
-      jishu++;
-    }
-    else
-    {
-      huandaoRK=( mid_R_line[(uint8)iS] - mid_R_line[(uint8)iX])/(iS-iX);
-      huandaoRB= mid_R_line[(uint8)iS]-huandaoRK*(uint8)iS;
-      break;
-    }
-  }
-  
-}
-
 /***************************************切换+识别**********************************/
 void QieHuan()
 {
@@ -1688,150 +1288,6 @@ void QieHuan()
     }
     
   }
-}
-
-/************************************超声波开关********************************************/
-void Ch_Sh_Bo()
-{                             //13
-  int8 PIT2_i = 0 ,PIT2_i_Max = 15 , PIT2_i_Min = 3 , PIT2_JiShu=0 , PIT2_JiShu1 = 0 , PIT2_JiShu2 = 0;      // 30  修改为  20
-  //int8  PIT2_JiShu3=0 ;
-  //uint8 PIT2_YuZhi1 = 8 ,PIT2_YuZhi2 = 5 ;
-  uint8 PIT2_ChuCun = 0 ;
-  // uint8 PIT2_Flag1 = 0 ,PIT2_Flag2 = 0;
-  
-  if( PIT2_Flag == 0 )          //直道检测有效距离300--600mm
-  {
-    /***********************************************直道检测断路*************************************************/
-    
-    for( PIT2_i = PIT2_i_Max ; PIT2_i > PIT2_i_Min ; PIT2_i-- )      //从图像下向上找
-    {
-      if( img[PIT2_i][40] == 0x00 )                             //判断前方中间点的颜色来大概确定前方是否有路
-      {
-        PIT2_JiShu ++ ;
-        if( PIT2_JiShu == 2 )    PIT2_ChuCun = PIT2_i + 2 ;           //储存
-      }
-    }
-    
-    if( PIT2_JiShu >= (uint8)( ( PIT2_i_Max - PIT2_i_Min ) * 0.1 ) )            //如果白点过即前方无路，标志成立 0.2限制条件
-    {
-      for( PIT2_i = PIT2_ChuCun ; PIT2_i <= PIT2_i_Max ; PIT2_i ++ )
-      {
-        if( ( mid_R_line[PIT2_i] < straig_Rline[PIT2_i] + 8 ) && ( mid_L_line[PIT2_i] > straig_Lline[PIT2_i] - 8 ) &&
-           ( mid_R_line[PIT2_i] > 40 ) && ( mid_L_line[PIT2_i] < 40 ) && panduanL[PIT2_i] == 0 && panduanR[PIT2_i] == 0 )
-        {
-          PIT2_JiShu1 ++ ;
-        }
-      }
-      
-      if( ( mid_R_line[PIT2_i] < straig_Rline[PIT2_i] + 8) && ( mid_L_line[PIT2_i] > straig_Lline[PIT2_i] - 8 ) &&
-         ( mid_R_line[PIT2_i] > 40 ) && ( mid_L_line[PIT2_i] < 40 ) )
-        for( PIT2_i = mid_L_line[PIT2_ChuCun] ; PIT2_i <= mid_R_line[PIT2_ChuCun] ; PIT2_i ++)
-        {
-          if( img[PIT2_ChuCun - 3][PIT2_i] == 0x00 && img[PIT2_ChuCun + 3][PIT2_i] == 0xff )   //2为限制条件
-          {
-            PIT2_JiShu2 ++ ;
-          }
-        }
-      
-      if( PIT2_JiShu2 >= (uint8)( 0.7 * ( mid_R_line[PIT2_ChuCun] - mid_L_line[PIT2_ChuCun] )) &&       //0.7为限制条件
-         PIT2_JiShu2 <= (uint8)( 1.5 * ( mid_R_line[PIT2_ChuCun] - mid_L_line[PIT2_ChuCun] )) &&
-           PIT2_JiShu1 >= (uint8)( 0.5 * ( PIT2_i_Max - PIT2_ChuCun ) ) )
-      {
-        PIT2_Flag = 1 ;
-        
-      }
-      
-    }
-    
-    /*****************************************弯道检测断路***************************************************/
-    
-    /*  if( PIT2_JiShu >= (uint8)(( PIT2_i_Max - PIT2_i_Min) * 0.1 ) )
-    if( QIE_ChuCun > 0 )
-    {
-    for( PIT2_i = PIT2_i_Max - 10 ; PIT2_i >= PIT2_i_Min - 5; PIT2_i --)
-    {
-    if( mid_R_line[PIT2_i] - mid_R_line[PIT2_i-2] <= 5 && mid_R_line[PIT2_i] - mid_R_line[PIT2_i-2] > 0  && mid_R_line[PIT2_i] <= straig_Rline[PIT2_i] + 5
-    && mid_L_line[PIT2_i - 2] - mid_L_line[PIT2_i] <= 5 && mid_L_line[PIT2_i - 2] - mid_L_line[PIT2_i] > 0  && mid_L_line[PIT2_i] >= straig_Lline[PIT2_i] - 5 )
-    {
-    if( mid_R_line[PIT2_i] - mid_L_line[PIT2_i] >=  mid_R_line[PIT2_i - 2] - mid_L_line[PIT2_i - 2] )
-    {
-    if( mid_R_line[PIT2_i] - mid_L_line[PIT2_i] <= 10 )
-    {
-    QieHuan_Flag = 1 ;
-    break;
-  }
-  }
-  }
-    if( QieHuan_Flag == 1 )            break;
-  }
-  }                                                      */
-    
-    /****************************************第二次弯道*********************************************/
-    
-    /*   PIT2_JiShu=0 ; PIT2_JiShu2 = 0 ; PIT2_JiShu = 0 ;  PIT2_JiShu1 = 0 ;
-    
-    for( PIT2_i = PIT2_i_Max ; PIT2_i >= PIT2_i_Min -  5 ; PIT2_i -- )
-    {
-    if( mid_L_line[PIT2_i] > straig_Lline[PIT2_i] && mid_L_line[PIT2_i] < straig_Rline[PIT2_i] &&
-    mid_R_line[PIT2_i] < straig_Rline[PIT2_i] && mid_R_line[PIT2_i] > straig_Lline[PIT2_i])  //小于直道宽度
-    {
-    if(  mid_R_line[PIT2_i] - mid_R_line[PIT2_i-1] <= 5 && mid_R_line[PIT2_i] - mid_R_line[PIT2_i-1] > 0 &&   //趋势减小
-    mid_L_line[PIT2_i - 1] - mid_L_line[PIT2_i] <= 5 && mid_L_line[PIT2_i - 1] - mid_L_line[PIT2_i] > 0 )
-    {
-    if( mid_R_line[PIT2_i] - mid_L_line[PIT2_i] >  mid_R_line[PIT2_i - 1] - mid_L_line[PIT2_i - 1] )  //  宽度减小
-    {
-    PIT2_JiShu ++ ;
-    if( ( ( mid_R_line[PIT2_i] - mid_L_line[PIT2_i] <= 10 ) ||( mid_R_line[PIT2_i - 1 ] - mid_L_line[PIT2_i - 1] <= 10 )
-    || ( mid_R_line[PIT2_i + 1] - mid_L_line[PIT2_i + 1] <= 10 ) ) && PIT2_JiShu >= 3 )
-    {
-    PIT2_Flag  ++ ;
-    if( PIT2_Flag >= 2 )  PIT2_Flag = 2 ;
-    break ;
-  }
-  }
-  }
-  }
-  }
-    
-    for( PIT2_i = PIT2_ChuCun ; PIT2_i <= PIT2_i_Max ; PIT2_i ++ )
-    {
-    if( mid_L_line[PIT2_i] > straig_Lline[PIT2_i] && mid_R_line[PIT2_i] < straig_Rline[PIT2_i] )
-    {
-    if(  mid_R_line[PIT2_i] - mid_R_line[PIT2_i-2] <= 3 && mid_R_line[PIT2_i] - mid_R_line[PIT2_i-2] > 0 &&
-    mid_L_line[PIT2_i - 2] - mid_L_line[PIT2_i] <= 3 && mid_L_line[PIT2_i - 2] - mid_L_line[PIT2_i] > 0 )
-    {
-    if( mid_R_line[PIT2_i] - mid_L_line[PIT2_i] >=  mid_R_line[PIT2_i - 2] - mid_L_line[PIT2_i - 2] )
-    {
-    PIT2_JiShu3 ++ ;
-  }
-  }
-  }
-  }                                                                                                          */
-  }
-}
-/*****************************************坡道******************************************************/
-void podao()
-{
-  
-  uint8 podao_i = 0 ,podao_sum = 0 ;
-  
-  for( podao_i = 10 ; podao_i <= 20 ; podao_i ++ )
-  {
-    if( panduanL[podao_i] == 0 && panduanR[podao_i] == 0 )          //左右都找到
-    {
-      if( mid_L_line[podao_i] >= 5 && mid_L_line[podao_i] <= (straig_Lline[podao_i] - 3 ) &&     //左右边线控制范围
-         mid_R_line[podao_i] <= 75 && mid_R_line[podao_i] >= (straig_Rline[podao_i] + 3 ) )
-      {
-        if( mid_R_line[podao_i] - mid_L_line[podao_i] > straig_Rline[podao_i] - straig_Lline[podao_i] + 1 )    //赛道宽度限制   全黑并没有判断
-        {
-          podao_sum ++ ;
-        }
-      }
-    }
-  }
-  
-  if( podao_sum >= 7 )   podao_Flag = 1 ;
-  else                   podao_Flag = 0 ;
 }
 
 /************************************直道弯道检测****************************************/
@@ -2232,38 +1688,7 @@ void huamid()
   }
 }
 
-/***************************salted_fish电机驱动**********************************/
-void salted_fish_dianji()
-{
-  
-  /*if( QieHuan_Flag == 0 && DIYH_flag_L == 0 && DIYH_flag_R == 0)  //不切换同时  电磁圆环不成立
-  {
-  ftm_pwm_duty(MOTOR_FTM ,MOTOR1_PWM,350);           //   第三个电机驱动
-  ftm_pwm_duty(MOTOR_FTM ,MOTOR2_PWM,0);         //   第一个电机驱动
-  ftm_pwm_duty(MOTOR_FTM ,MOTOR3_PWM,350);           //   第二个电机驱动
-  ftm_pwm_duty(MOTOR_FTM ,MOTOR4_PWM,0);         //   第四个电机驱动
-}
-  else
-  {
-  ftm_pwm_duty(MOTOR_FTM ,MOTOR1_PWM,270);           //   第三个电机驱动
-  ftm_pwm_duty(MOTOR_FTM ,MOTOR2_PWM,0);         //   第一个电机驱动
-  ftm_pwm_duty(MOTOR_FTM ,MOTOR3_PWM,270);           //   第二个电机驱动
-  ftm_pwm_duty(MOTOR_FTM ,MOTOR4_PWM,0);         //   第四个电机驱动
-}                                                                                                               */
-  
-  
-  
-  ftm_pwm_duty(MOTOR_FTM ,MOTOR1_PWM,270);           //   第三个电机驱动
-  ftm_pwm_duty(MOTOR_FTM ,MOTOR2_PWM,0);         //   第一个电机驱动
-  ftm_pwm_duty(MOTOR_FTM ,MOTOR3_PWM,270);           //   第二个电机驱动
-  ftm_pwm_duty(MOTOR_FTM ,MOTOR4_PWM,0);         //   第四个电机驱动
-  
-  
-  
-  
-  
-  
-}
+
 /****************************baodi电机驱动********************************1*/
 
 void dianji_Left_baodi()
@@ -2325,347 +1750,6 @@ void dianji_baodi()
   
   dianji_Right_baodi();
   dianji_Left_baodi();
-  
-}
-
-/****************************disu电机驱动*********************************/
-void dianji_Left_disu()
-{
-  if( BZ == 1 )
-  {
-    SpeedKP_left=20;
-    SpeedKI_left=50;
-    SpeedKD_left=0;
-  }
-  else if( hudao2RLF == 1 || hudao2RRF == 1 )
-  {
-    SpeedKP_left=0;
-    SpeedKI_left=30;
-    SpeedKD_left=0;
-  }
-  else if( hudao1CLF == 1 || hudao1CRF == 1 )
-  {
-    SpeedKP_left=0;
-    SpeedKI_left=30;
-    SpeedKD_left=0;
-  }
-  else if( length_val[0] <= 980 )
-  {
-    SpeedKP_left=0;
-    SpeedKI_left=50;
-    SpeedKD_left=70;
-  }
-  else if( QieHuan_Flag == 1 )
-  {
-    SpeedKP_left=0;
-    SpeedKI_left=20;
-    SpeedKD_left=0;
-  }
-  else if ( right_currve_flag == 1 || left_currve_flag == 1 )
-  {
-    SpeedKP_left=10;
-    SpeedKI_left=70;
-    SpeedKD_left=0;
-  }
-  /* else if( zhidao_flag == 1 )
-  {
-  SpeedKP_left=0;
-  SpeedKI_left=40;
-  SpeedKD_left=0;
-}                                        */
-  else
-  {
-    SpeedKP_left=6;
-    SpeedKI_left=30;
-    SpeedKD_left=20;
-  }
-  
-  left_E[2]=left_E[1];
-  left_E[1]=left_E[0];
-  left_E[0]=dianji_left_speed-val_left;
-  left_speed=left_speed
-    +SpeedKP_left*( left_E[0] - left_E[1])
-      +SpeedKI_left*( left_E[0] )
-        +SpeedKD_left*(left_E[0] - 2*left_E[1]+  left_E[2]);
-  
-  if( podao_Flag == 1 && length_val[0] <= 500 )
-  {
-    //    if(left_speed>=4000)
-    {
-      left_speed=4000;
-      FTM_CnV_REG(FTMN[FTM0],MOTOR2_PWM)=0;//1500}          //   第一个电机驱动
-      FTM_CnV_REG(FTMN[FTM0],MOTOR3_PWM)=(uint32)(left_speed);                       //   第二个电机驱动
-    }
-  }
-  else if( zhidao_flag == 1 && BZ == 0 && length_val[0] >= 980 &&
-          hudao2RLF == 0 && hudao2RRF == 0 && hudao1CLF == 0 && hudao1CRF == 0 )
-  {
-    // if(left_speed>=2500)
-    {
-      left_speed=1600;
-      FTM_CnV_REG(FTMN[FTM0],MOTOR2_PWM)=0;//1500}          //   第一个电机驱动
-      FTM_CnV_REG(FTMN[FTM0],MOTOR3_PWM)=(uint32)(left_speed);                       //   第二个电机驱动
-    }
-  }
-  else if(left_speed>=1600)
-  {
-    left_speed=1600;
-    FTM_CnV_REG(FTMN[FTM0],MOTOR2_PWM)=0;//1500}          //   第一个电机驱动
-    FTM_CnV_REG(FTMN[FTM0],MOTOR3_PWM)=(uint32)(left_speed);                       //   第二个电机驱动
-  }
-  else if(left_speed<0)
-  {
-    if ( right_currve_flag == 1 || left_currve_flag == 1 && BZ == 0 && length_val[0] >= 980 &&
-        hudao2RLF == 0 && hudao2RRF == 0 && hudao1CLF == 0 && hudao1CRF == 0 )
-    {
-      left_speed = -1 * left_speed ;
-      FTM_CnV_REG(FTMN[FTM0],MOTOR2_PWM)=(uint32)(left_speed);//1500}          //   第一个电机驱动
-      FTM_CnV_REG(FTMN[FTM0],MOTOR3_PWM)=0;                       //   第二个电机驱动
-    }
-    else if(left_speed<= -1500)
-    {
-      left_speed = 1500 ;
-      FTM_CnV_REG(FTMN[FTM0],MOTOR2_PWM)=(uint32)(left_speed);//1500}          //   第一个电机驱动
-      FTM_CnV_REG(FTMN[FTM0],MOTOR3_PWM)=0;                       //   第二个电机驱动
-    }
-    else
-    {
-      left_speed = 0 ;
-      FTM_CnV_REG(FTMN[FTM0],MOTOR2_PWM)=0;//1500}          //   第一个电机驱动
-      FTM_CnV_REG(FTMN[FTM0],MOTOR3_PWM)=(uint32)(left_speed);                       //   第二个电机驱动
-    }
-  }
-  else
-  {
-    FTM_CnV_REG(FTMN[FTM0],MOTOR2_PWM)=0;//1500}          //   第一个电机驱动
-    FTM_CnV_REG(FTMN[FTM0],MOTOR3_PWM)=(uint32)(left_speed);                       //   第二个电机驱动
-  }
-  
-  //  FTM_CnV_REG(FTMN[FTM0],MOTOR2_PWM)=0;//1500}          //   第一个电机驱动
-  //  FTM_CnV_REG(FTMN[FTM0],MOTOR3_PWM)=(uint32)(left_speed);                       //   第二个电机驱动
-  //  FTM_CnV_REG(FTMN[FTM0],MOTOR2_PWM)=(uint32)(left_speed);//1500}          //   第一个电机驱动
-  //  FTM_CnV_REG(FTMN[FTM0],MOTOR3_PWM)=0;                       //   第二个电机驱动
-  
-  
-}
-
-void dianji_Right_disu()
-{
-  if( BZ == 1)
-  {
-    SpeedKP_right=20;
-    SpeedKI_right=50;
-    SpeedKD_right=0;
-  }
-  else if( hudao2RLF == 1 || hudao2RRF == 1 )
-  {
-    SpeedKP_right=0;
-    SpeedKI_right=30;
-    SpeedKD_right=0;
-  }
-  else if( hudao1CLF == 1 || hudao1CRF == 1 )
-  {
-    SpeedKP_right=0;
-    SpeedKI_right=30;
-    SpeedKD_right=0;
-  }
-  else if( length_val[0] <= 980 )
-  {
-    SpeedKP_right=0;
-    SpeedKI_right=50;
-    SpeedKD_right=70;
-  }
-  else if( QieHuan_Flag == 1 )
-  {
-    SpeedKP_right=0;
-    SpeedKI_right=20;
-    SpeedKD_right=0;
-  }
-  else if ( right_currve_flag == 1 || left_currve_flag == 1 )
-  {
-    SpeedKP_right=10;
-    SpeedKI_right=70;
-    SpeedKD_right=0;
-  }
-  /* else if( zhidao_flag == 1 )
-  {
-  SpeedKP_right=0;
-  SpeedKI_right=40;
-  SpeedKD_right=0;
-}                                            */
-  else
-  {
-    SpeedKP_right=6;
-    SpeedKI_right=30;
-    SpeedKD_right=20;
-  }
-  
-  right_E[2]=right_E[1];
-  right_E[1]=right_E[0];
-  right_E[0]=dianji_right_speed+val_right;
-  right_speed=right_speed
-    +SpeedKP_right*( right_E[0] - right_E[1] )
-      +SpeedKI_right*( right_E[0] )
-        +SpeedKD_right*(right_E[0] - 2*right_E[1]+  right_E[2]);
-  if( podao_Flag == 1 && length_val[0] <= 500 )
-  {
-    //  if(right_speed>=4000)
-    {
-      right_speed=4000;
-      FTM_CnV_REG(FTMN[FTM0],MOTOR4_PWM)=0;//1500}          //   第一个电机驱动
-      FTM_CnV_REG(FTMN[FTM0],MOTOR1_PWM)=(uint32)(right_speed);                       //   第二个电机驱动
-    }
-  }
-  else if( zhidao_flag == 1 && BZ == 0 && length_val[0] >= 980 &&
-          hudao2RLF == 0 && hudao2RRF == 0 && hudao1CLF == 0 && hudao1CRF == 0 )
-  {
-    // if(left_speed>=2500)
-    {
-      right_speed=1600;
-      FTM_CnV_REG(FTMN[FTM0],MOTOR4_PWM)=0;//1500}          //   第一个电机驱动
-      FTM_CnV_REG(FTMN[FTM0],MOTOR1_PWM)=(uint32)(right_speed);                       //   第二个电机驱动
-    }
-  }
-  else if(right_speed>=1600)
-  {
-    right_speed=1600;
-    FTM_CnV_REG(FTMN[FTM0],MOTOR4_PWM)=0;//1500}          //   第一个电机驱动
-    FTM_CnV_REG(FTMN[FTM0],MOTOR1_PWM)=(uint32)(right_speed);                       //   第二个电机驱动
-  }
-  else if(right_speed<0)
-  {
-    if ( right_currve_flag == 1 || left_currve_flag == 1 && BZ == 0 && length_val[0] >= 980 &&
-        hudao2RLF == 0 && hudao2RRF == 0 && hudao1CLF == 0 && hudao1CRF == 0 )
-    {
-      right_speed = -1 * right_speed ;
-      FTM_CnV_REG(FTMN[FTM0],MOTOR4_PWM)=(uint32)(right_speed);//1500}          //   第一个电机驱动
-      FTM_CnV_REG(FTMN[FTM0],MOTOR1_PWM)=0;                       //   第二个电机驱动
-    }
-    else if(right_speed<= -1500)
-    {
-      right_speed = 1500 ;
-      FTM_CnV_REG(FTMN[FTM0],MOTOR4_PWM)=0;//1500}          //   第一个电机驱动
-      FTM_CnV_REG(FTMN[FTM0],MOTOR1_PWM)=(uint32)(right_speed);                       //   第二个电机驱动
-    }
-    else
-    {
-      right_speed = 0 ;
-      FTM_CnV_REG(FTMN[FTM0],MOTOR4_PWM)=0;//1500}          //   第一个电机驱动
-      FTM_CnV_REG(FTMN[FTM0],MOTOR1_PWM)=(uint32)(right_speed);                       //   第二个电机驱动
-    }
-  }
-  else
-  {
-    FTM_CnV_REG(FTMN[FTM0],MOTOR4_PWM)=0;//1500}          //   第一个电机驱动
-    FTM_CnV_REG(FTMN[FTM0],MOTOR1_PWM)=(uint32)(right_speed);                       //   第二个电机驱动
-  }
-  // FTM_CnV_REG(FTMN[FTM0],MOTOR4_PWM)=0;//1500}          //   第一个电机驱动
-  //  FTM_CnV_REG(FTMN[FTM0],MOTOR1_PWM)=(uint32)(right_speed);                       //   第二个电机驱动
-  //   FTM_CnV_REG(FTMN[FTM0],MOTOR4_PWM)=(uint32)(right_speed);//1500}          //   第一个电机驱动
-  //   FTM_CnV_REG(FTMN[FTM0],MOTOR1_PWM)=0;                       //   第二个电机驱动
-  
-}
-
-void dianji_disu()
-{
-  float A = 1.0 ;                      //
-  float B = 1.0 ;
-  float K = 0.15 ;
-  uint16 V = 70 ;
-  
-  //uint8 L = 20 , G =18;
-  
-  /*****************************请标志********************************/
-  
-  if( BZ == 1 )
-  {
-    V = 20 ; A = 1.5 ;  B = 0.9 ;  K = 0.5 ;
-    dianji_right_speed = (int)( A*V*( B+ K*(BZ_duty-dj_mid)/75.0 ) );
-    dianji_left_speed  = (int)( A*V*( B- K*(BZ_duty-dj_mid)/75.0 ) );
-  }
-  else if( hudao2RLF == 1 || hudao2RRF == 1 )
-  {
-    V = 60 ; A = 1.1 ;  B = 1.0 ;  K = 0.3 ;
-    dianji_right_speed = (int)( A*V*( B+ K*(duoji_duty-dj_mid)/75.0 ) );
-    dianji_left_speed  = (int)( A*V*( B- K*(duoji_duty-dj_mid)/75.0 ) );
-  }
-  else if( hudao1CLF == 1 || hudao1CRF == 1 )
-  {
-    V = 60 ; A = 1.1 ;  B = 1.0 ;  K = 0.3 ;
-    dianji_right_speed = (int)( A*V*( B+ K*(duoji_duty-dj_mid)/75.0 ) );
-    dianji_left_speed  = (int)( A*V*( B- K*(duoji_duty-dj_mid)/75.0 ) );
-  }
-  else if ( length_val[0] <= 980 )
-  {
-    if( podao_Flag == 1 && length_val[0] <= 450 )              //直接赋值
-    {
-      V = 120 ;                                           //没实际应用
-      dianji_right_speed = 200;
-      dianji_left_speed  = 200;
-    }
-    else
-    {
-      V= 10 ;
-      dianji_right_speed = (int)( A*V*( B+ K*(duoji_duty-dj_mid)/75.0 ) );
-      dianji_left_speed  = (int)( A*V*( B- K*(duoji_duty-dj_mid)/75.0 ) );
-    }
-  }
-  else if( QieHuan_Flag == 1 )
-  {
-    V = 30 ; A = 1.2 ; B = 0.9 ; K = 0.3 ;
-    dianji_right_speed = (int)( A*V*( B+ (duoji_duty_V-dj_mid)/75.0 ) );
-    dianji_left_speed  = (int)( A*V*( B- (duoji_duty_V-dj_mid)/75.0 ) );
-  }
-  else if ( right_currve_flag == 1 || left_currve_flag == 1 )
-  {
-    if( right_currve_flag  == 1)
-    {
-      V = 70 ; A = 1.1 ; B = 1.4 ; K = 0.3 ;
-      dianji_right_speed = (int)( A*V*( B+ (duoji_duty-dj_mid)/75.0 ) );
-      dianji_left_speed  = (int)( A*V*( B- (duoji_duty-dj_mid)/75.0 ) );
-    }
-    else
-    {
-      V = 70 ; A = 1.1 ; B = 1.4 ; K = 0.3 ;
-      dianji_right_speed = (int)( A*V*( B+ (duoji_duty-dj_mid)/75.0 ) );
-      dianji_left_speed  = (int)( A*V*( B- (duoji_duty-dj_mid)/75.0 ) );
-      
-    }
-  }
-  /* else if( zhidao_flag == 1 )
-  {
-  dianji_right_speed = 200 ;
-  dianji_left_speed  = 200 ;
-}                                                                     */
-  else
-  {
-    //c车模前后两轮之间的距离28cm,宽18cm.
-    //dianji_right_speed= V（理论速度）*（）
-    dianji_right_speed = (int)( A*V*( B+ K*(duoji_duty-dj_mid)/75.0 ) );
-    dianji_left_speed  = (int)( A*V*( B- K*(duoji_duty-dj_mid)/75.0 ) );
-    // dianji_right_speed=(int)(A*V*( B - (duoji_duty-dj_mid)*(duoji_duty-dj_mid)/90 /100.0));
-    // dianji_left_speed=(int)(A*V*( B + (duoji_duty-dj_mid)*(duoji_duty-dj_mid)/90 /100.0));
-  }
-  
-  /* else if( hudao2RLF == 1 || hudao2RRF == 1 )
-  {
-  
-}
-   else if( hudao1CLF == 1 || hudao1CRF == 1 )
-  {
-  
-}
-   else if( shziF1 == 1)
-  {
-  
-}                                                                   */
-  
-  
-  
-  dianji_Right_disu();
-  dianji_Left_disu();
-  
-  
   
 }
 
@@ -2884,18 +1968,11 @@ void dianji_7_2()
   }
   else if ( length_val[0] <= 980 )
   {
-    if( podao_Flag == 1 && length_val[0] <= 450 )              //直接赋值
-    {
-      V = 120 ;                                           //没实际应用
-      dianji_right_speed = 200;
-      dianji_left_speed  = 200;
-    }
-    else
-    {
+    
       V= 10 ;
       dianji_right_speed = (int)( A*V*( B+ K*(duoji_duty-dj_mid)/75.0 ) );
       dianji_left_speed  = (int)( A*V*( B- K*(duoji_duty-dj_mid)/75.0 ) );
-    }
+    
   }
   else  if( left_currve_flag == 1 || right_currve_flag == 1 )
   {
