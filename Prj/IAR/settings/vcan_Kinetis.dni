@@ -15,7 +15,7 @@ TraceBufferSize=0x00010000
 TraceStallIfFIFOFull=0x00000000
 TracePortSize=0x00000004
 [DebugChecksum]
-Checksum=-1320237455
+Checksum=713979870
 [Exceptions]
 StopOnUncaught=_ 0
 StopOnThrow=_ 0
@@ -63,8 +63,9 @@ A4=_ "C:\Users\Think\Desktop\勇者无敌一队比赛程序\Chip\src\MK60_ftm.c" ""
 A5=_ "C:\Users\Think\Desktop\勇者无敌一队比赛程序\Chip\src\MK60_gpio.c" ""
 A6=_ "C:\Users\Think\Desktop\勇者无敌一队比赛程序\Chip\src\MK60_mcg.c" ""
 A7=_ "C:\Users\Think\Desktop\勇者无敌一队比赛程序\Chip\src\MK60_uart.c" ""
-A8=_ "C:\Users\朱文旭的大电脑\Desktop\k60\比赛程序 - 圆环第二种\aaaa\App\main.c" ""
-A9=_ "C:\Users\朱文旭的大电脑\Desktop\比赛程序 - 圆环第二种\aaaa\Chip\src\IAR\startup_MK60DZ10.s" ""
-A10=_ "C:\Users\朱文旭的大电脑\Desktop\程序\程序\程序\Chip\src\IAR\startup_MK60DZ10.s" ""
-Count=11
+A8=_ "C:\Users\hhh\Desktop\新建文件夹 (2)\程序\程序\App\main.c" ""
+A9=_ "C:\Users\朱文旭的大电脑\Desktop\k60\比赛程序 - 圆环第二种\aaaa\App\main.c" ""
+A10=_ "C:\Users\朱文旭的大电脑\Desktop\比赛程序 - 圆环第二种\aaaa\Chip\src\IAR\startup_MK60DZ10.s" ""
+A11=_ "C:\Users\朱文旭的大电脑\Desktop\程序\程序\程序\Chip\src\IAR\startup_MK60DZ10.s" ""
+Count=12
 SuppressDialog=1
