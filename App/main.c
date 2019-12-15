@@ -50,7 +50,7 @@ uint8 xz1[60]={0,11,12,13,14,15,16,17,18,19,
 40,40,40,40,40,40,40,40,40,40          //矫正数组
 };
 
-/********************************************************舵机/电机变量模块*******************************************/
+/********************************************************舵机变量模块*******************************************/
 
 //舵机定义
 #define MOTOR_FTM   FTM0
@@ -69,9 +69,20 @@ uint8 xz1[60]={0,11,12,13,14,15,16,17,18,19,
 #define dj_left_max         625                 //左极限    10000-1675              650.0
 #define dj_right_max        765                  //右极限    10000-1375              820.0
 
+uint16 duoji_duty=800;                                //舵机占空比
 
-#define i_max 40 
-#define i_min 10 
+float KP=4.6 ;   // 5.6                               //PD算法常量
+float KD=4.6;
+
+float duoji_last_error=0.0,duoji_error=0.0;             //中线平均偏差值
+float duoji_last_errorV=0.0,duoji_errorV=0.0;             //中线平均偏差值
+float sum=0.0,ave=0.0;
+
+float duoji_K1 = 0.0 , duoji_K2 = 0.0 ;             //舵机斜率
+float duoji_error_hunhe = 0.0 ;
+
+/********************************************************电机PID*******************************************/
+#define MOTOR_HZ    (20*1000)                        //电机频率
 
 float  SpeedKP_left;
 float  SpeedKI_left;
@@ -87,41 +98,16 @@ float right_E[3]={0.0,0.0,0.0};         //右偏差
 double right_speed=0.0,left_speed=0.0;  //左轮输出PWM 右轮输出PWM
 int dianji_left_speed=0,dianji_right_speed=0;   // 左轮理论速度  右轮理论速度 (求出来的值)
 
-
-
-float KP=4.6 ;   // 5.6                               //PD算法常量
-float KD=4.6;
-
-float KP1=5.6 ;   //摄像头斜率
-float KD1=8.6;
-
-float KPV=5.6 ;   // 5.6                               //PD算法常量
-float KDV=3.1;    //3.1
-
-
-uint16 duoji_duty=800;                                //舵机占空比
-                                                 //避障占空比
-
-/**********************************************************************************************************/
-float duoji_last_error=0.0,duoji_error=0.0;             //中线平均偏差值
-float duoji_last_errorV=0.0,duoji_errorV=0.0;             //中线平均偏差值
-float sum=0.0,ave=0.0;
-
-float duoji_K1 = 0.0 , duoji_K2 = 0.0 ;             //舵机斜率
-float duoji_error_hunhe = 0.0 ;
-
-
-//电机
-#define MOTOR_HZ    (20*1000)                        //电机频率
-
-
 /********************************************************赛道分析变量模块*******************************************/
 
 int mid[60],mid1[60];                                                               //中线存储数组    赛道一半宽储存数组
 int mid_L_line[60]={0},mid_R_line[60]={0},mid_L_line_last=0,mid_R_line_last=0;      //中线储存数组
 int panduanL[60]={0},panduanR[60]={0};                                            //0 是找到点  1 是未找到点
 
+#define i_max 40                          //检测行最下方
+#define i_min 10                         //检测行最上方 
 
+uint8  mid_j=25;
 
 uint8 left_currve_flag,right_currve_flag;                                           //  左弯道   右弯道
 uint8 currve_flag ;                                                                 //弯道标志
@@ -129,7 +115,7 @@ uint8 zhidao_flag ;                                                             
 
 uint8 base_all_white_left,base_all_white_right;                                    //基准行无路判断划分全白行参量
 
-
+double time=0.0;
 
 /********************************************************蓝牙模块*******************************************/
 
@@ -138,13 +124,6 @@ int16 val_left=0,val_right=0;
 
 int var2[60];
 int var3[60];
-
-
-/***********************************************摄像头/电磁切换模块*******************************************/
-
-
-/***********************************************坡道模块*******************************************/
-
 
 /*******************************避障模块*********************************/
 
@@ -199,7 +178,8 @@ void huamid();                                                                  
 void midline();                                                                   //找中线
 void daolu_fenxi();                                                               //弯直道判断
 
-/******tools***********************/                                                              //获取电压
+/******tools***********************/ 
+void bizhang_time();
 int GYH(int AD_max,int AD_min,int value);                                        //归一化
 float m_sqrt(unsigned int x);                                                   //开根号函数
 float Qulv(int x1,int x2,int x3,int y1,int y2,int y3);                         //曲率
@@ -226,19 +206,25 @@ void lcd_display()
   site.y =70;
   LCD_num_C(site,length_val[0],FCOLOUR,BCOLOUR);
   
-  Site_t site1  = {0, 0};
-  site1.x =0;
-  site1.y =60;
+  site.x =0;
+  site.y =60;
   
   x= abs(Angle_X/32768.0*180);
   y=abs(Angle_Y/32768.0*180);
   z=abs(Angle_Z/32768.0*180);
-  LCD_num_C(site1,x,FCOLOUR,BCOLOUR);
-  site1.y=80;
-  LCD_num_C(site1,y,FCOLOUR,BCOLOUR);
-  site1.y=100;
-  LCD_num_C(site1,z,FCOLOUR,BCOLOUR);
-
+  LCD_num_C(site,x,FCOLOUR,BCOLOUR);
+  site.y=80;
+  LCD_num_C(site,y,FCOLOUR,BCOLOUR);
+  site.y=100;
+  LCD_num_C(site,z,FCOLOUR,BCOLOUR);
+  
+  site.x =100;
+  site.y =0;
+   LCD_num_C(site,BZ,FCOLOUR,BCOLOUR);
+  site.y=20;
+  LCD_num_C(site,BZ_gc,FCOLOUR,BCOLOUR);
+  site.y=40;
+  LCD_num_C(site,time*100,FCOLOUR,BCOLOUR);
 }
 
 /***************************dianjihuang电机驱动**********************************/
@@ -283,31 +269,24 @@ void  main(void)
   set_vector_handler(UART1_RX_TX_VECTORn,uart1_test_handler);
   uart_rx_irq_en(UART1);
   
-  
-  NVIC_SetPriorityGrouping(4);            //设置优先级分组,4bit 抢占优先级,没有亚优先级
-  
-  NVIC_SetPriority(PORTA_IRQn,0);         //配置优先级
-  //NVIC_SetPriority(PORTE_IRQn,1);       //配置优先级
-  NVIC_SetPriority(DMA0_IRQn,2);          //配置优先级
-  NVIC_SetPriority(PIT0_IRQn,3);          //配置优先级
-  //NVIC_SetPriority(PIT2_IRQn,4);        //配置优先级
-  NVIC_SetPriority(UART0_RX_TX_IRQn,1);
-  
-  DisableInterrupts;
-  EnableInterrupts;
-  rxflag=0;
-  rxcnt=0;                                               
-  
-  SCCB_WriteByte ( OV7725_CNST, 40 );      //调阈值  //16
+   /*******************设置中断优先级******************/                                           
+   NVIC_SetPriorityGrouping(4);            //设置优先级分组,4bit 抢占优先级,没有亚优先级
+   NVIC_SetPriority(PORTA_IRQn,0);         //配置优先级
+   NVIC_SetPriority(DMA0_IRQn,1);          //配置优先级
+   NVIC_SetPriority(PIT0_IRQn,4);          //配置优先级
+   NVIC_SetPriority(UART1_RX_TX_IRQn,3);   //配置优先级
+   NVIC_SetPriority(UART0_RX_TX_IRQn,2);
+
+   DisableInterrupts;
+   EnableInterrupts;
+   
+   SCCB_WriteByte ( OV7725_CNST, 40 );      //调阈值  //22
   
   while(1)
   {
     midline();
     huamid();
-    //duoji();
-   
-    
-               
+           
 //    var[0]= (float)Angle_X/32768.0*180;
 //    var[1]=(float)Angle_Y/32768.0*180;
 //    var[2]=(float)Angle_Z/32768.0*180;
@@ -322,9 +301,12 @@ void PIT0_IRQHandler2()
  
   val_right = -ftm_quad_get(FTM2);          //获取FTM 正交解码 的脉冲数(负数表示反方向)
   val_left  = ftm_quad_get(FTM1);
-  duoji();
   dianjihuang();
+  
   TOF_1020();
+  
+  bizhang_time();
+  duoji();
   var[0] =val_right;
   var[1] =val_left;
   var[2]=0;
@@ -336,6 +318,28 @@ void PIT0_IRQHandler2()
   
 }
 
+/********************************************避障计时************************************/
+void bizhang_time()
+{
+   if(BZ==1)
+  {
+    BZ_gc=1;
+   time+=0.01;
+   mid_j=55;
+   if(time>=2.0)
+   {
+     BZ_gc=0;
+     time=0;
+     mid_j=25;
+   }
+  }
+  else
+  {
+    time=0;
+    BZ_gc=0;
+    mid_j=25;
+  }
+}
 
 /********************************************UART0蓝牙接收************************************/
 void uart0_test_handler(void)
@@ -367,6 +371,7 @@ void uart0_test_handler(void)
     }
   }
 }
+
 /********************************************UART1陀螺仪接收************************************/
 void uart1_test_handler(void)
 {
@@ -400,6 +405,7 @@ void uart1_test_handler(void)
     }
   }
 }
+
 /***************************************TOF测距函数************************************/
 void TOF_1020()
 {
@@ -433,27 +439,23 @@ void TOF_1020()
   }
  
   
- if( length_val[0] <= 850 && length_val[0] >= 300 )
+ if( length_val[0] <= 750 && length_val[0] >= 300 )
  {
    if( length_val[2] > length_val[1] && length_val[1] > length_val[0] )//&& length_val[2] <= 750 )
    {
-     if( BZ_gc == 0 )
+     if( BZ_gc == 0 )       //不是在避障过程
      {
        BZ = 1 ;
      }
-     else
-     {
-       BZ_gc = 0 ;
-       BZ = 0;
-     }
+     
    }
  }
  else
  {
-	 BZ=0;
+       BZ=0;
  }
- 
 }
+
 /*************************LCD寻找中线判断路况************************************/
 void  midline()
 {
@@ -471,7 +473,7 @@ void  midline()
   for(i=i_max;i>=i_min;i--)
   {
     
-    for(j_l=40;j_l>1;j_l--)                        //左边赛道
+    for(j_l=mid_back;j_l>1;j_l--)                        //左边赛道
     {
       if(img[i][j_l]==0xff && img[i][j_l-1]==0x00)
       {
@@ -487,7 +489,7 @@ void  midline()
         flag_L=0;
       }
     }
-    for(j_r=40;j_r<78;j_r++)                       //右边赛道
+    for(j_r=mid_back;j_r<78;j_r++)                       //右边赛道
     {
       if(img[i][j_r]==0xff && img[i][j_r+1]==0x00)
       {
@@ -531,7 +533,7 @@ void  midline()
     {
       //  mid_L_line[i]=mid_L_line_last;
       //  mid_R_line[i]=mid_R_line_last;
-      mid[i] = 40;
+      mid[i] = mid_j;
       
     }
     if(mid[i] <= 0)     mid_back=1;
@@ -688,7 +690,7 @@ void duoji()
 {
   float x = 0.0 ;
   
-  if( zhidao_flag == 1)
+  if( zhidao_flag == 1&&&BZ_gc==0)
   {
     KP = 1.6 ;
     KD = 4.2 ;
@@ -699,6 +701,7 @@ void duoji()
     KD = 7.9 ;
   }
   
+  
   for(int  s = i_max ; s >= i_min ; s-- )                   //计算均值
   {
     sum+=mid[s];
@@ -707,7 +710,7 @@ void duoji()
   
   ave=sum/x ;
   sum=0 ;
-  duoji_error=ave-59 ; //角速度                               //计算偏差
+  duoji_error=ave-mid_j ; //角速度                               //计算偏差
   
 
   duoji_duty=(uint16)(dj_mid+KP*duoji_error+KD*(duoji_error-duoji_last_error) ) ;   //dj;
@@ -777,8 +780,7 @@ for(int i=1;i<60;i++)
   }
 }
 
-/****************************baodi电机驱动********************************1*/
-
+/****************************baodi电机驱动**********************************/
 void dianji_Left_baodi()
 {
   SpeedKP_left=32;
@@ -802,6 +804,7 @@ void dianji_Left_baodi()
   
   
 }
+
 void dianji_Right_baodi()
 {//增量式pid，csdn收藏里有解释算法
   SpeedKP_right=32;
@@ -841,7 +844,6 @@ void dianji_baodi()
   
 }
 
-
 void disu_duoji()
 {
   
@@ -861,7 +863,6 @@ void disu_duoji()
     KD = 7.9 ;
   }
 }
-
 
 /**********************液晶摄像头初始化*******************************************/
 void lcd_camera_init()
@@ -886,13 +887,7 @@ int GYH(int AD_max,int AD_min,int value)
   return (int)val;
 }
 
-
-
-
-/*!
-*  @brief      PORTA中断服务函数
-*  @since      v5.0
-*/
+/*************************************PORTA中断服务函数********************************************/
 void PORTA_IRQHandler()
 {
   uint8  n;    //引脚号
@@ -918,10 +913,7 @@ void PORTA_IRQHandler()
   
 }
 
-/*!
-*  @brief      DMA0中断服务函数
-*  @since      v5.0
-*/
+/*************************************DMA0中断服务函数********************************************/
 void DMA0_IRQHandler()
 {
   camera_dma();
@@ -962,6 +954,7 @@ int Atan (float Bz_K)
   result = (atan (param) * 180 / PI);  //将弧度转换为度
   return (int)result;
 }
+
 /**************************************递归函数******************************************/
 /*uint8 digui( int8 x1 , int8 x2)
 {
