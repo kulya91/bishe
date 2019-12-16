@@ -6,7 +6,6 @@
 #include <stdio.h>      /* printf */
 #include <math.h>       /* atan */
 
-
 uint8 img[CAMERA_H][CAMERA_W];                       //LCD显示  0xff黑   0x00白
 uint8 imgbuff[CAMERA_SIZE];                          //定义存储接收图像的数组
 
