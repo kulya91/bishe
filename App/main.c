@@ -17,6 +17,7 @@ uint8 straig_Lline[60]={                              //左边直线储存数组
   6 ,5 ,5 ,4 ,4 ,4 ,3 ,3 ,2 ,2 ,
   2 ,1 ,1 ,1 ,0 ,0 ,0 ,0 ,0 ,0
 };
+
 uint8 straig_Rline[60]={                             //右边直线储存数组
   79,42,43,43,44,45,46,47,48,49,
   50,51,52,53,54,55,56,57,58,59,
@@ -25,6 +26,7 @@ uint8 straig_Rline[60]={                             //右边直线储存数组
   71,72,72,73,74,74,75,75,76,76,
   77,77,77,78,78,79,79,79,79,79
 };
+
 uint8 straig_Mline[60]={                                //中间直线储存数组
   40,40,40,40,40,40,40,40,40,40,
   40,40,40,40,40,40,40,40,40,40,
@@ -49,9 +51,7 @@ uint8 xz1[60]={0,11,12,13,14,15,16,17,18,19,
 40,40,40,40,40,40,40,40,40,40          //矫正数组
 };
 
-/********************************************************舵机变量模块*******************************************/
-
-//舵机定义
+/******************************************电机舵机模块宏定义***********************************************************/
 #define MOTOR_FTM   FTM0
 #define MOTOR1_PWM  FTM_CH2          //A5
 #define MOTOR2_PWM  FTM_CH3          //A6
@@ -63,6 +63,7 @@ uint8 xz1[60]={0,11,12,13,14,15,16,17,18,19,
 #define MOTOR3_PWM_IO  FTM0_CH2
 #define MOTOR4_PWM_IO  FTM0_CH5
 
+/********************************************************舵机变量模块*******************************************/
 //  下面是  s30110 舵机  频率  50Hz  时间控制
 #define dj_mid              695                    //舵机居中                680.0
 #define dj_left_max         625                    //左极限                  650.0
@@ -74,10 +75,9 @@ float KP=4.6;                                             //PD算法常量
 float KD=4.6;
 
 float duoji_last_error=0.0,duoji_error=0.0;             //中线平均偏差值
-float duoji_last_errorV=0.0,duoji_errorV=0.0;             //中线平均偏差值
 float sum=0.0,ave=0.0;
 
-float duoji_K1 = 0.0 , duoji_K2 = 0.0 ;             //舵机斜率
+float duoji_K1 = 0.0 , duoji_K2 = 0.0 ;                  //舵机斜率
 float duoji_error_hunhe = 0.0 ;
 
 /********************************************************电机PID*******************************************/
@@ -91,11 +91,11 @@ float  SpeedKP_right;
 float  SpeedKI_right;
 float  SpeedKD_right;
 
-float left_E[3]={0.0,0.0,0.0};          //左偏差
-float right_E[3]={0.0,0.0,0.0};         //右偏差
+float left_E[3]={0.0,0.0,0.0};                            //左偏差
+float right_E[3]={0.0,0.0,0.0};                           //右偏差
 
-double right_speed=0.0,left_speed=0.0;  //左轮输出PWM 右轮输出PWM
-int dianji_left_speed=0,dianji_right_speed=0;   // 左轮理论速度  右轮理论速度 (求出来的值)
+double right_speed=0.0,left_speed=0.0;                    //左轮输出PWM 右轮输出PWM
+int dianji_left_speed=0,dianji_right_speed=0;             // 左轮理论速度  右轮理论速度 (求出来的值)
 
 /********************************************************赛道分析变量模块*******************************************/
 #define i_max 40                                                                    //检测行最下方
@@ -134,19 +134,20 @@ unsigned char  ucRxCnt = 0;
 short Angle_X;
 short Angle_Y;
 short Angle_Z;
-int x,y,z;
+float x,y,z;
 
 /********************************************************函数声明模块*******************************************/
-
 void PORTA_IRQHandler();                                                           //中断
 void DMA0_IRQHandler();
 void PIT0_IRQHandler();                                                            //定时器中断
 void uart0_test_handler(void);                                                     //串口接受中断
 void uart1_test_handler(void);                                                     //串口接受中断
 
+void  initall();                                                                    //初始化
 void TOF_1020();                                                                   //TOF数据处理
 
-void duoji();                                                                     //舵机
+/**********舵机************/
+void duoji();                                                                   
 void disu_duoji();
 /*********电机*************/
 void dianji_baodi();                                                            
@@ -162,7 +163,8 @@ void findFlag();                                                                
 void lcd_camera_init();                                                            //LCD初始化
 void lcd_display();                                                                //LCD显示
 void drawingMidLine();                                                             //画中线
-/******tools***********************/ 
+
+/***********tools*****************/ 
 void bizhang_time();
 int GYH(int AD_max,int AD_min,int value);                                        //归一化
 float m_sqrt(unsigned int x);                                                   //开根号函数
@@ -216,11 +218,23 @@ void dianjihuang()
   FTM_CnV_REG(FTMN[FTM0],MOTOR2_PWM)=0;
   FTM_CnV_REG(FTMN[FTM0],MOTOR3_PWM)=1200;
 }
-/*****************************主函数*********************************************/
-
+/*********************************主函数*****************************************************/
 void  main(void)
 {
-  ftm_quad_init(FTM2);                                     //FTM1 正交解码初始化（所用的管脚可查 port_cfg.h ）
+  initall();
+  while(1)
+  {
+    processImage();
+    drawingMidLine();
+    lcd_display();      //lcd显示
+    
+  }
+}
+
+/********************************初始化******************************************************/
+void  initall()
+{
+   ftm_quad_init(FTM2);                                     //FTM1 正交解码初始化（所用的管脚可查 port_cfg.h ）
   ftm_quad_init(FTM1);
   
   ftm_pwm_init(MOTOR_FTM, MOTOR2_PWM,MOTOR_HZ,0);          //初始化 电机 PWM             第一个电机驱动
@@ -266,17 +280,9 @@ void  main(void)
   EnableInterrupts;
   
   SCCB_WriteByte ( OV7725_CNST, 40 );      //调阈值  //22
-  
-  while(1)
-  {
-    processImage();
-    drawingMidLine();
-    lcd_display();      //lcd显示
-    
-  }
 }
 
-/********************************编码器，电机，清中断************************************************/
+/********************************定时器中断0，编码器，电机，清中断***************************/
 void PIT0_IRQHandler()
 {
   val_right = -ftm_quad_get(FTM2);          //获取FTM 正交解码 的脉冲数(负数表示反方向)
@@ -301,7 +307,7 @@ void PIT1_IRQHandler()
  // vcan_sendware((float *)var, sizeof(var));
    PIT_Flag_Clear(PIT1);       //清中断标志位
 }
-/********************************************UART0蓝牙接收************************************/
+/********************************UART0蓝牙接收**********************************************/
 void uart0_test_handler(void)
 {
   UARTn_e uratn = UART0;
@@ -332,17 +338,15 @@ void uart0_test_handler(void)
   }
 }
 
-/********************************************UART1陀螺仪接收************************************/
+/*********************************UART1陀螺仪接收*******************************************/
 void uart1_test_handler(void)
 {
   UARTn_e uratn = UART1;
   if(UART_S1_REG(UARTN[uratn]) & UART_S1_RDRF_MASK)   //接收数据寄存器满
   {
     uart_getchar(UART1,&ucRxBuffer[ucRxCnt++]);
-    
     if (ucRxBuffer[0]!=0x55) 
     {
-      
       ucRxCnt=0;
       return;																																	  
     }
@@ -369,7 +373,7 @@ void uart1_test_handler(void)
   }
 }
 
-/********************************************避障计时************************************/
+/*********************************避障计时**************************************************/
 void bizhang_time()
 {
   if(BZ==1)
@@ -389,7 +393,7 @@ void bizhang_time()
   }
 }
 
-/***************************************TOF测距函数************************************/
+/*********************************TOF测距函数***********************************************/
 void TOF_1020()
 {
   if(rxflag)
@@ -581,6 +585,26 @@ void duoji()
   
 }
 
+void disu_duoji()
+{
+  
+  if ( right_currve_flag == 1 || left_currve_flag == 1 )
+  {
+    KP = 8.8 ;
+    KD = 9.6 ;
+  }
+  else if( zhidao_flag == 1)
+  {
+    KP = 1.6 ;
+    KD = 4.2 ;
+  }
+  else
+  {
+    KP = 5.2 ;
+    KD = 7.9 ;
+  }
+}
+
 /****************************baodi电机驱动**********************************/
 void dianji_Left_baodi()
 {
@@ -643,26 +667,6 @@ void dianji_baodi()
   dianji_Right_baodi();
   dianji_Left_baodi();
   
-}
-
-void disu_duoji()
-{
-  
-  if ( right_currve_flag == 1 || left_currve_flag == 1 )
-  {
-    KP = 8.8 ;
-    KD = 9.6 ;
-  }
-  else if( zhidao_flag == 1)
-  {
-    KP = 1.6 ;
-    KD = 4.2 ;
-  }
-  else
-  {
-    KP = 5.2 ;
-    KD = 7.9 ;
-  }
 }
 
 /**********************************画出中线**************************************/
