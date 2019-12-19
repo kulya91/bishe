@@ -1,46 +1,46 @@
-"C:\Users\hhh\Desktop\新建文件夹 (2)\程序\程序\Board\src\VCAN_NRF24L0_MSG.c"
+"C:\Users\hhh\Desktop\毕设\程序\程序\Board\src\VCAN_NRF24L0_MSG.c"
 -std=c99
 -ferror-limit=100
 -I
-C:\Users\hhh\Desktop\新建文件夹 (2)\程序\程序\Prj\IAR\..\..\App
+C:\Users\hhh\Desktop\毕设\程序\程序\Prj\IAR\..\..\App
 -I
-C:\Users\hhh\Desktop\新建文件夹 (2)\程序\程序\Prj\IAR\..\..\App\Inc
+C:\Users\hhh\Desktop\毕设\程序\程序\Prj\IAR\..\..\App\Inc
 -I
-C:\Users\hhh\Desktop\新建文件夹 (2)\程序\程序\Prj\IAR\..\..\Board\Inc
+C:\Users\hhh\Desktop\毕设\程序\程序\Prj\IAR\..\..\Board\Inc
 -I
-C:\Users\hhh\Desktop\新建文件夹 (2)\程序\程序\Prj\IAR\..\..\Chip\inc
+C:\Users\hhh\Desktop\毕设\程序\程序\Prj\IAR\..\..\Chip\inc
 -I
-C:\Users\hhh\Desktop\新建文件夹 (2)\程序\程序\Prj\IAR\..\..\Chip\inc\IAR
+C:\Users\hhh\Desktop\毕设\程序\程序\Prj\IAR\..\..\Chip\inc\IAR
 -I
-C:\Users\hhh\Desktop\新建文件夹 (2)\程序\程序\Prj\IAR\..\..\Chip\inc\kinetis
+C:\Users\hhh\Desktop\毕设\程序\程序\Prj\IAR\..\..\Chip\inc\kinetis
 -I
-C:\Users\hhh\Desktop\新建文件夹 (2)\程序\程序\Prj\IAR\..\..\Lib\CMSIS\Inc
+C:\Users\hhh\Desktop\毕设\程序\程序\Prj\IAR\..\..\Lib\CMSIS\Inc
 -I
-C:\Users\hhh\Desktop\新建文件夹 (2)\程序\程序\Prj\IAR\..\..\Lib\FatFs
+C:\Users\hhh\Desktop\毕设\程序\程序\Prj\IAR\..\..\Lib\FatFs
 -I
-C:\Users\hhh\Desktop\新建文件夹 (2)\程序\程序\Prj\IAR\..\..\Lib\USB
+C:\Users\hhh\Desktop\毕设\程序\程序\Prj\IAR\..\..\Lib\USB
 -I
 E:\aastudy\iar\arm\inc
 -I
 E:\aastudy\iar\arm\inc\c
 -I
-C:\Users\hhh\Desktop\新建文件夹 (2)\程序\程序\App
+C:\Users\hhh\Desktop\毕设\程序\程序\App
 -I
-C:\Users\hhh\Desktop\新建文件夹 (2)\程序\程序\App\Inc
+C:\Users\hhh\Desktop\毕设\程序\程序\App\Inc
 -I
-C:\Users\hhh\Desktop\新建文件夹 (2)\程序\程序\Board\Inc
+C:\Users\hhh\Desktop\毕设\程序\程序\Board\Inc
 -I
-C:\Users\hhh\Desktop\新建文件夹 (2)\程序\程序\Chip\inc
+C:\Users\hhh\Desktop\毕设\程序\程序\Chip\inc
 -I
-C:\Users\hhh\Desktop\新建文件夹 (2)\程序\程序\Chip\inc\IAR
+C:\Users\hhh\Desktop\毕设\程序\程序\Chip\inc\IAR
 -I
-C:\Users\hhh\Desktop\新建文件夹 (2)\程序\程序\Chip\inc\kinetis
+C:\Users\hhh\Desktop\毕设\程序\程序\Chip\inc\kinetis
 -I
-C:\Users\hhh\Desktop\新建文件夹 (2)\程序\程序\Lib\CMSIS\Inc
+C:\Users\hhh\Desktop\毕设\程序\程序\Lib\CMSIS\Inc
 -I
-C:\Users\hhh\Desktop\新建文件夹 (2)\程序\程序\Lib\FatFs
+C:\Users\hhh\Desktop\毕设\程序\程序\Lib\FatFs
 -I
-C:\Users\hhh\Desktop\新建文件夹 (2)\程序\程序\Lib\USB
+C:\Users\hhh\Desktop\毕设\程序\程序\Lib\USB
 -DDEBUG=1
 -DARM_MATH_CM4=1
 -DMK60F15=1
