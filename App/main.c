@@ -69,17 +69,6 @@ uint8 xz1[60]={0,11,12,13,14,15,16,17,18,19,
 #define dj_left_max         625                    //左极限                  650.0
 #define dj_right_max        765                    //右极限                  820.0
 
-uint16 duoji_duty=800;                                    //舵机占空比
-
-float KP=4.6;                                             //PD算法常量
-float KD=4.6;
-
-float duoji_last_error=0.0,duoji_error=0.0;             //中线平均偏差值
-float sum=0.0,ave=0.0;
-
-float duoji_K1 = 0.0 , duoji_K2 = 0.0 ;                  //舵机斜率
-float duoji_error_hunhe = 0.0 ;
-
 /********************************************************电机PID*******************************************/
 #define MOTOR_HZ    (20*1000)                        //电机频率
 
@@ -105,7 +94,7 @@ int mid[60]={39},mid1[60];                                                      
 int mid_L_line[60]={0},mid_R_line[60]={0};                                          //左右边缘存储数组
 int flag_L[60]={0},flag_R[60]={0};                                                  //1 是找到点  0 是未找到点
 
-uint8  mid_j=26;                                                                    //中线偏移
+uint8  mid_j=30;                                                                    //中线偏移
 
 uint8 left_currve_flag,right_currve_flag;                                           //  左弯道   右弯道
 uint8 currve_flag ;                                                                 //弯道标志
@@ -113,7 +102,7 @@ uint8 zhidao_flag ;                                                             
 
 /********************************************************蓝牙模块*******************************************/
 float var[4];
-int16 val_left=0,val_right=0;
+int16 val_left,val_right;
 int var2[60];
 int var3[60];
 
@@ -131,11 +120,12 @@ int i_2019;
 /*******陀螺仪*******/
 unsigned char ucRxBuffer[12];
 unsigned char  ucRxCnt = 0;
-short Angle_X;
-short Angle_Y;
-short Angle_Z;
-float x,y,z;
-
+short Angle[3];
+float angle_x,angle_y,angle_z;
+short Acc[3];
+float acc_x,acc_y,acc_z;
+float gy_distance;
+float gy_speed;
 /********************************************************函数声明模块*******************************************/
 void PORTA_IRQHandler();                                                           //中断
 void DMA0_IRQHandler();
@@ -166,6 +156,8 @@ void lcd_display();                                                             
 void drawingMidLine();                                                             //画中线
 
 /***********tools*****************/ 
+float getGyroDate(float x1,float x2);                                            //获取陀螺仪两次差值
+float getGyroDistance(float a);                                                  //获取陀螺仪横向位移
 void bizhang_time();
 int GYH(int AD_max,int AD_min,int value);                                        //归一化
 float m_sqrt(unsigned int x);                                                   //开根号函数
@@ -194,11 +186,11 @@ void lcd_display()
   site.x =0;
   site.y =60;
   
-  LCD_num_C(site,x,FCOLOUR,BCOLOUR);
+  LCD_num_C(site,angle_x,FCOLOUR,BCOLOUR);
   site.y=80;
-  LCD_num_C(site,y,FCOLOUR,BCOLOUR);
+  LCD_num_C(site,angle_y,FCOLOUR,BCOLOUR);
   site.y=100;
-  LCD_num_C(site,abs(z),FCOLOUR,BCOLOUR);
+  LCD_num_C(site,abs(angle_y),FCOLOUR,BCOLOUR);
   
   site.x =100;
   site.y =0;
@@ -228,7 +220,11 @@ void  main(void)
     processImage();
     lcd_display();      //lcd显示
     drawingMidLine();
-  
+    var[0] =val_right;
+  var[1] =val_left;
+  var[2]=right_speed;
+  var[3]=-left_speed;
+  vcan_sendware((float *)var, sizeof(var));
     
   }
 }
@@ -236,7 +232,7 @@ void  main(void)
 /********************************初始化******************************************************/
 void  initall()
 {
-   ftm_quad_init(FTM2);                                     //FTM1 正交解码初始化（所用的管脚可查 port_cfg.h ）
+  ftm_quad_init(FTM2);                                     //FTM1 正交解码初始化（所用的管脚可查 port_cfg.h ）
   ftm_quad_init(FTM1);
   
   ftm_pwm_init(MOTOR_FTM, MOTOR2_PWM,MOTOR_HZ,0);          //初始化 电机 PWM             第一个电机驱动
@@ -287,18 +283,15 @@ void  initall()
 /********************************定时器中断0，编码器，电机，清中断***************************/
 void PIT0_IRQHandler()
 {
-  val_right = ftm_quad_get(FTM1);          //获取FTM 正交解码 的脉冲数(负数表示反方向)
-  val_left  = ftm_quad_get(FTM2);
+  val_right =FTM_CNT_REG(FTMN[FTM1]);          //获取FTM 正交解码 的脉冲数(负数表示反方向)
+  ftm_quad_clean(FTM1);
+  val_left  = FTM_CNT_REG(FTMN[FTM2]);
+  ftm_quad_clean(FTM2); 
   //dianjihuang();
   dianji_baodi();
   TOF_1020();
   bizhang_time();
   duoji();
-   var[0] =val_right*10;
-  var[1] =-val_left*10;
-  var[2]=left_speed;
-  var[3]=right_speed;
-  vcan_sendware((float *)var, sizeof(var));
   ftm_quad_clean(FTM2);
   ftm_quad_clean(FTM1);
   PIT_Flag_Clear(PIT0);       //清中断标志位
@@ -360,13 +353,23 @@ void uart1_test_handler(void)
     {
       switch(ucRxBuffer[1])
       {
+		  case 0x51:
+		  Acc[0] = ((unsigned short)ucRxBuffer[3]<<8)|ucRxBuffer[2];
+		  Acc[1] = ((unsigned short)ucRxBuffer[5]<<8)|ucRxBuffer[4];
+		  Acc[2] = ((unsigned short)ucRxBuffer[7]<<8)|ucRxBuffer[6];
+		  acc_x=(float)Acc[0]/32768*16*9.8;
+		  acc_y=(float)Acc[1]/32768*16*9.8;
+		  acc_z=(float)Acc[2]/32768*16*9.8;
+		  
+		  break;
       case 0x53:
-        Angle_X = ((unsigned short)ucRxBuffer[3]<<8)|ucRxBuffer[2];
-        Angle_Y = ((unsigned short)ucRxBuffer[5]<<8)|ucRxBuffer[4];
-        Angle_Z = ((unsigned short)ucRxBuffer[7]<<8)|ucRxBuffer[6];
-        x= (float)(Angle_X/32768.0*180);
-        y=(float)(Angle_Y/32768.0*180);
-        z=(float)(Angle_Z/32768.0*180);
+        Angle[0] = ((unsigned short)ucRxBuffer[3]<<8)|ucRxBuffer[2];
+        Angle[1] = ((unsigned short)ucRxBuffer[5]<<8)|ucRxBuffer[4];
+        Angle[2] = ((unsigned short)ucRxBuffer[7]<<8)|ucRxBuffer[6];
+        angle_x=(float)(Angle[0]/32768.0*180);
+        angle_y=(float)(Angle[1]/32768.0*180);
+        angle_z=(float)(Angle[2]/32768.0*180);
+		break;
       default:
         break;
         
@@ -384,15 +387,15 @@ void bizhang_time()
   {
     time+=0.01;
     mid_j=47;
-    if(time>=0.15)mid_j=52;
-    if(time>=0.30)mid_j=55;
-    if(time>=0.45)mid_j=45;
-    if(time>=0.60)mid_j=32;
-    if(time>=0.75)
+    if(time>=0.10)mid_j=52;
+    if(time>=0.20)mid_j=55;
+    if(time>=0.25)mid_j=45;
+    if(time>=0.30)mid_j=32;
+    if(time>=0.40)
     {
       BZ=0;
       time=0;
-      mid_j=25;
+      mid_j=30;
     }
   }
 }
@@ -561,8 +564,13 @@ int getObstacleDistance()
 /*************************************舵机;由平均值计算出占空比**************************************/
 void duoji()
 {
-  float x = 0.0 ;
+  float x = 0.0,sum=0.0,ave=0.0; ;
+  uint16 duoji_duty;                                    //舵机占空比
+  float KP;                                             //PD算法常量
+  float KD;
   
+  static float duoji_last_error=0.0,duoji_error=0.0;             //中线平均偏差值
+
   if( zhidao_flag == 1&&BZ==0)
   {
     KP = 1.6 ;
@@ -570,7 +578,7 @@ void duoji()
   }
   else if(BZ==1)
   {
-      KP = 3.6 ;
+    KP = 3.6 ;
     KD = 5.2 ;
   }
   else
@@ -605,16 +613,13 @@ void duoji()
 void dianji_baodi()
 {
   
-  float A = 1.0 ;                      //
-  float B = 1.0 ;
-  float K = 0.15 ;
-  uint16 V = 80 ;
-  if( BZ == 1 )
-  {
-    V = 20 ; A = 1.5 ;  B = 0.9 ;  K = 0.5 ;
+  float A;                      //
+  float B;
+  float K;
+  uint16 V;
+    V =120; A = 1.5 ;  B = 0.9 ;  K = 0.3 ;
     dianji_right_speed = (int)( A*V*( B+ K*(dj_mid-dj_mid)/70.0 ) );
     dianji_left_speed  = (int)( A*V*( B- K*(dj_mid-dj_mid)/70.0 ) );
-  }
   dianji_Right_baodi();
   dianji_Left_baodi();
   
@@ -622,40 +627,40 @@ void dianji_baodi()
 
 void dianji_Left_baodi()
 {
-  SpeedKP_left=15.32;
-  SpeedKI_left=1.34;
-  SpeedKD_left=2.45;
+  SpeedKP_left=5;
+  SpeedKI_left=1.0;
+  SpeedKD_left=1.0;
   left_E[2]=left_E[1];
   left_E[1]=left_E[0];
-  left_E[0]=15+val_left;
+  left_E[0]=dianji_left_speed+val_left;
   left_speed=left_speed
     +SpeedKP_left*( left_E[0] - left_E[1])
       +SpeedKI_left*( left_E[0] )
         +SpeedKD_left*(left_E[0] - 2*left_E[1]+  left_E[2]);
   if(left_speed>=1500)
     left_speed=1500;
-  if(left_speed<=0)
-    left_speed=0;
+  if(left_speed<=300)
+    left_speed=300;
   FTM_CnV_REG(FTMN[FTM0],MOTOR2_PWM)=(uint32)(left_speed);        
   FTM_CnV_REG(FTMN[FTM0],MOTOR3_PWM)=0;                       //   第二个电机驱动
 }
 
 void dianji_Right_baodi()
 {
-  SpeedKP_right=1.32;
-  SpeedKI_right=1.34;
-  SpeedKD_right=2.45;
+  SpeedKP_right=5;
+  SpeedKI_right=1.0;
+  SpeedKD_right=1.0;
   right_E[2]=right_E[1];
   right_E[1]=right_E[0];
-  right_E[0]=15-val_right;
+  right_E[0]=dianji_right_speed-val_right;
   right_speed=right_speed
     +SpeedKP_right*( right_E[0] - right_E[1])
       +SpeedKI_right*( right_E[0] )
         +SpeedKD_right*(right_E[0] - 2*right_E[1]+  right_E[2]);
   if(right_speed>=1500)
     right_speed=1500;
-  if(right_speed<=0)
-    right_speed=0;
+  if(right_speed<=300)
+    right_speed=300;
   FTM_CnV_REG(FTMN[FTM0],MOTOR4_PWM)=(uint32)right_speed;
   FTM_CnV_REG(FTMN[FTM0],MOTOR1_PWM)=0;
 
@@ -747,7 +752,36 @@ void DMA0_IRQHandler()
   camera_dma();
 }
 
+/***************************************陀螺仪工具函数**************************************************/
+/***************************************获取陀螺仪两次差值****************************************/
+float getGyroDate(float x1,float x2)
+{
+	float angle;
+	if(x1>=x2)
+	{
+		if(x1-x2>=180.0)
+			angle=360.0-(x1-x2);
+		else
+			angle=x2-x1;
+	}
+	else
+	{
+		if(x2-x1>=180.0)
+			angle=(x2-x1)-360.0;
+		else
+			angle=x2-x1;
+	}
+	return angle;
+}
+
+float getGyroDistance(float a)
+{
+	gy_speed=gy_speed+a*0.01;
+	gy_distance=gy_distance+gy_speed*0.01;
+	return gy_distance;
+}
 /***************************************开根号***********************************************/
+
 float m_sqrt(unsigned int x)
 {
   uint8 ans=0,p=0x80;
