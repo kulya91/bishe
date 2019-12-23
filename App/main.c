@@ -101,7 +101,7 @@ uint8 currve_flag ;                                                             
 uint8 zhidao_flag ;                                                                 //直道标志
 
 /********************************************************蓝牙模块*******************************************/
-float var[4];
+float var[5];
 int16 val_left,val_right;
 int var2[60];
 int var3[60];
@@ -196,7 +196,7 @@ void lcd_display()
   site.y =0;
   LCD_num_C(site,BZ,FCOLOUR,BCOLOUR);
   site.y=20;
-  LCD_num_C(site,getObstacleDistance(),FCOLOUR,BCOLOUR);
+  LCD_num_C(site,zhidao_flag,FCOLOUR,BCOLOUR);
   site.y=40;
   LCD_num_C(site,(int)(time*100),FCOLOUR,BCOLOUR);
 }
@@ -206,7 +206,7 @@ void dianjihuang()
 {
   //right
   FTM_CnV_REG(FTMN[FTM0],MOTOR4_PWM)=0;
-  FTM_CnV_REG(FTMN[FTM0],MOTOR1_PWM)=500;
+  FTM_CnV_REG(FTMN[FTM0],MOTOR1_PWM)=1500;
   //left
   FTM_CnV_REG(FTMN[FTM0],MOTOR2_PWM)=0;
   FTM_CnV_REG(FTMN[FTM0],MOTOR3_PWM)=1500;
@@ -221,12 +221,83 @@ void  main(void)
     lcd_display();      //lcd显示
     drawingMidLine();
     var[0] =val_right;
-  var[1] =val_left;
-  var[2]=right_speed;
-  var[3]=-left_speed;
-  vcan_sendware((float *)var, sizeof(var));
+    var[1] =val_left;
+    var[2]=75;
+    var[3]=-75;
+     var[4]=zhidao_flag*100;
+    vcan_sendware((float *)var, sizeof(var));
+
+
+    //DELAY_MS(50);
     
   }
+}
+
+/****************************baodi电机驱动**********************************/
+void dianji_baodi()
+{
+  
+  float A;                      //
+  float B;
+  float K;
+  uint16 V;
+  if(zhidao_flag==1)
+  {
+    V =75; A = 1.0 ;  B = 1.0 ;  K = 0.0 ;
+  }
+  else
+  {
+    V =50; A = 1.0 ;  B = 1.0 ;  K = 0.2 ;
+  }
+  dianji_right_speed = (int)( A*V*( B+ K*(dj_mid-dj_mid)/70.0 ) );
+  dianji_left_speed  = (int)( A*V*( B- K*(dj_mid-dj_mid)/70.0 ) );
+  dianji_Right_baodi();
+  dianji_Left_baodi();
+  
+}
+
+void dianji_Left_baodi()
+{
+  SpeedKP_left=40;
+  SpeedKI_left=35;
+  SpeedKD_left=0;
+  left_E[2]=left_E[1];
+  left_E[1]=left_E[0];
+  left_E[0]=dianji_left_speed+val_left;
+  // left_E[0]=75+val_left;
+  left_speed=left_speed
+    +SpeedKP_left*( left_E[0] - left_E[1])
+      +SpeedKI_left*( left_E[0] )
+        +SpeedKD_left*(left_E[0] - 2*left_E[1]+  left_E[2]);
+  if(left_speed>=2200)
+    left_speed=2200;
+  if(left_speed<=100)
+    left_speed=100;
+  FTM_CnV_REG(FTMN[FTM0],MOTOR2_PWM)=(uint32)(left_speed);        
+  FTM_CnV_REG(FTMN[FTM0],MOTOR3_PWM)=0;                       //   第二个电机驱动
+}
+
+void dianji_Right_baodi()
+{
+  SpeedKP_right=40;
+  SpeedKI_right=35;
+  SpeedKD_right=0;
+  right_E[2]=right_E[1];
+  right_E[1]=right_E[0];
+  right_E[0]=dianji_right_speed-val_right;
+  //right_E[0]=75-val_right;
+  right_speed=right_speed
+    +SpeedKP_right*( right_E[0] - right_E[1])
+      +SpeedKI_right*( right_E[0] )
+        +SpeedKD_right*(right_E[0] - 2*right_E[1]+  right_E[2]);
+  if(right_speed>=2200)
+    right_speed=2200;
+  if(right_speed<=100)
+    right_speed=100;
+  FTM_CnV_REG(FTMN[FTM0],MOTOR4_PWM)=(uint32)right_speed;
+  FTM_CnV_REG(FTMN[FTM0],MOTOR1_PWM)=0;
+
+  
 }
 
 /********************************初始化******************************************************/
@@ -283,19 +354,16 @@ void  initall()
 /********************************定时器中断0，编码器，电机，清中断***************************/
 void PIT0_IRQHandler()
 {
-  val_right =FTM_CNT_REG(FTMN[FTM1]);          //获取FTM 正交解码 的脉冲数(负数表示反方向)
-  ftm_quad_clean(FTM1);
-  val_left  = FTM_CNT_REG(FTMN[FTM2]);
-  ftm_quad_clean(FTM2); 
+  val_right =ftm_quad_get(FTM1);
+  val_left =ftm_quad_get(FTM2);
   //dianjihuang();
   dianji_baodi();
   TOF_1020();
   bizhang_time();
   duoji();
   ftm_quad_clean(FTM2);
-  ftm_quad_clean(FTM1);
+  ftm_quad_clean(FTM1); 
   PIT_Flag_Clear(PIT0);       //清中断标志位
-  
 }
 
 void PIT1_IRQHandler()
@@ -357,9 +425,10 @@ void uart1_test_handler(void)
 		  Acc[0] = ((unsigned short)ucRxBuffer[3]<<8)|ucRxBuffer[2];
 		  Acc[1] = ((unsigned short)ucRxBuffer[5]<<8)|ucRxBuffer[4];
 		  Acc[2] = ((unsigned short)ucRxBuffer[7]<<8)|ucRxBuffer[6];
-		  acc_x=(float)Acc[0]/32768*16*9.8;
-		  acc_y=(float)Acc[1]/32768*16*9.8;
+		  acc_x=(float)Acc[0]/32768*16*9.8+0.315;
+		  acc_y=(float)Acc[1]/32768*16*9.8-0.6;
 		  acc_z=(float)Acc[2]/32768*16*9.8;
+                 // getGyroDistance(acc_x);
 		  
 		  break;
       case 0x53:
@@ -450,7 +519,7 @@ void  processImage()
   img_extract((uint8 *)img,(uint8 *)imgbuff,CAMERA_SIZE);       //解压为二维数组
   //vcan_sendimg((uint8 *)imgbuff, sizeof(imgbuff));
   analyzeRoad();
-  findFlag();
+ // findFlag();
   getMidLine();
 }
 
@@ -510,7 +579,7 @@ void findFlag()
     if( daolu_Mid_lose >= 6 )     break;
   }
   
-  if( daolu_sum >= 16 )
+  if( daolu_sum >= 24 )
     zhidao_flag = 1 ;
   else
     zhidao_flag = 0 ;
@@ -595,8 +664,12 @@ void duoji()
   
   ave=sum/x ;
   sum=0 ;
-  duoji_error=ave-mid_j ; //角速度                               //计算偏差
-  
+ 
+  duoji_error=ave-mid_j ;                               //计算偏差
+     if( abs(duoji_error) >= 5 )
+    zhidao_flag = 0 ;
+  else
+    zhidao_flag = 1 ;
   duoji_duty=(uint16)(dj_mid+KP*duoji_error+KD*(duoji_error-duoji_last_error) ) ;   //dj;
   
   duoji_last_error=duoji_error ;
@@ -609,63 +682,7 @@ void duoji()
   
 }
 
-/****************************baodi电机驱动**********************************/
-void dianji_baodi()
-{
-  
-  float A;                      //
-  float B;
-  float K;
-  uint16 V;
-    V =120; A = 1.5 ;  B = 0.9 ;  K = 0.3 ;
-    dianji_right_speed = (int)( A*V*( B+ K*(dj_mid-dj_mid)/70.0 ) );
-    dianji_left_speed  = (int)( A*V*( B- K*(dj_mid-dj_mid)/70.0 ) );
-  dianji_Right_baodi();
-  dianji_Left_baodi();
-  
-}
 
-void dianji_Left_baodi()
-{
-  SpeedKP_left=5;
-  SpeedKI_left=1.0;
-  SpeedKD_left=1.0;
-  left_E[2]=left_E[1];
-  left_E[1]=left_E[0];
-  left_E[0]=dianji_left_speed+val_left;
-  left_speed=left_speed
-    +SpeedKP_left*( left_E[0] - left_E[1])
-      +SpeedKI_left*( left_E[0] )
-        +SpeedKD_left*(left_E[0] - 2*left_E[1]+  left_E[2]);
-  if(left_speed>=1500)
-    left_speed=1500;
-  if(left_speed<=300)
-    left_speed=300;
-  FTM_CnV_REG(FTMN[FTM0],MOTOR2_PWM)=(uint32)(left_speed);        
-  FTM_CnV_REG(FTMN[FTM0],MOTOR3_PWM)=0;                       //   第二个电机驱动
-}
-
-void dianji_Right_baodi()
-{
-  SpeedKP_right=5;
-  SpeedKI_right=1.0;
-  SpeedKD_right=1.0;
-  right_E[2]=right_E[1];
-  right_E[1]=right_E[0];
-  right_E[0]=dianji_right_speed-val_right;
-  right_speed=right_speed
-    +SpeedKP_right*( right_E[0] - right_E[1])
-      +SpeedKI_right*( right_E[0] )
-        +SpeedKD_right*(right_E[0] - 2*right_E[1]+  right_E[2]);
-  if(right_speed>=1500)
-    right_speed=1500;
-  if(right_speed<=300)
-    right_speed=300;
-  FTM_CnV_REG(FTMN[FTM0],MOTOR4_PWM)=(uint32)right_speed;
-  FTM_CnV_REG(FTMN[FTM0],MOTOR1_PWM)=0;
-
-  
-}
 
 /**********************************画出中线**************************************/
 void drawingMidLine()
