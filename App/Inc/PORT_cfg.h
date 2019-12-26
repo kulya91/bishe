@@ -54,7 +54,7 @@
 
 //      模块通道    端口          可选范围              建议
 #define FTM1_CH0_PIN    PTA12       //PTA8、PTA12、PTB0
-#define FTM1_CH1_PIN    PTA13        //PTA9、PTA13、PTB1
+#define FTM1_CH1_PIN    PTA9        //PTA9、PTA13、PTB1
 
 //      模块通道    端口          可选范围              建议
 #define FTM2_CH0_PIN    PTA10       //PTA10、PTB18

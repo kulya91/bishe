@@ -51,6 +51,30 @@ uint8 xz1[60]={0,11,12,13,14,15,16,17,18,19,
 40,40,40,40,40,40,40,40,40,40          //矫正数组
 };
 
+//1维的卡尔曼滤波
+typedef struct {
+  float x;  // 系统的状态量 
+  float A;  // x(n)=A*x(n-1)+u(n),u(n)~N(0,q) 
+  float H;  // z(n)=H*x(n)+w(n),w(n)~N(0,r)   
+  float q;  // 预测过程噪声协方差
+  float r;  // 测量过程噪声协方差 
+  float p;  // 估计误差协方差
+  float gain;//卡尔曼增益
+}kalman_struct_left;
+
+//1维的卡尔曼滤波
+typedef struct {
+  float x;  // 系统的状态量 
+  float A;  // x(n)=A*x(n-1)+u(n),u(n)~N(0,q) 
+  float H;  // z(n)=H*x(n)+w(n),w(n)~N(0,r)   
+  float q;  // 预测过程噪声协方差
+  float r;  // 测量过程噪声协方差 
+  float p;  // 估计误差协方差
+  float gain;//卡尔曼增益
+}kalman_struct_right;
+
+kalman_struct_left kalman_left;
+kalman_struct_right kalman_right;
 /******************************************电机舵机模块宏定义***********************************************************/
 #define MOTOR_FTM   FTM0
 #define MOTOR1_PWM  FTM_CH2          //A5
@@ -58,16 +82,13 @@ uint8 xz1[60]={0,11,12,13,14,15,16,17,18,19,
 #define MOTOR3_PWM  FTM_CH4          //A7
 #define MOTOR4_PWM  FTM_CH5          //D5
 
-#define MOTOR1_PWM_IO  FTM0_CH3
-#define MOTOR2_PWM_IO  FTM0_CH4
-#define MOTOR3_PWM_IO  FTM0_CH2
-#define MOTOR4_PWM_IO  FTM0_CH5
-
 /********************************************************舵机变量模块*******************************************/
 //  下面是  s30110 舵机  频率  50Hz  时间控制
 #define dj_mid              695                    //舵机居中                680.0
 #define dj_left_max         625                    //左极限                  650.0
 #define dj_right_max        765                    //右极限                  820.0
+
+uint16 duoji_duty;
 
 /********************************************************电机PID*******************************************/
 #define MOTOR_HZ    (20*1000)                        //电机频率
@@ -103,6 +124,7 @@ uint8 zhidao_flag ;                                                             
 /********************************************************蓝牙模块*******************************************/
 float var[5];
 int16 val_left,val_right;
+int16 val_left2,val_right2;
 int var2[60];
 int var3[60];
 
@@ -126,6 +148,7 @@ short Acc[3];
 float acc_x,acc_y,acc_z;
 float gy_distance;
 float gy_speed;
+
 /********************************************************函数声明模块*******************************************/
 void PORTA_IRQHandler();                                                           //中断
 void DMA0_IRQHandler();
@@ -163,6 +186,85 @@ int GYH(int AD_max,int AD_min,int value);                                       
 float m_sqrt(unsigned int x);                                                   //开根号函数
 float Qulv(int x1,int x2,int x3,int y1,int y2,int y3);                         //曲率
 int Atan (float Bz_K);                                                           //反正切弧度转化为角度
+
+void kalman_init_left(kalman_struct_left *kalman_lcw, float init_x, float init_p);
+float kalman_filter_left(kalman_struct_left *kalman_lcw, float measure);
+
+void kalman_init_right(kalman_struct_right *kalman_lcw, float init_x, float init_p);
+float kalman_filter_right(kalman_struct_right *kalman_lcw, float measure);
+
+/**
+*kalman_init - 卡尔曼滤波器初始化
+*@kalman_lcw：卡尔曼滤波器结构体
+*@init_x：待测量的初始值
+*@init_p：后验状态估计值误差的方差的初始值
+*/
+void kalman_init_left(kalman_struct_left *kalman_lcw, float init_x, float init_p)
+{
+  kalman_lcw->x = init_x;//待测量的初始值，如有中值一般设成中值
+  kalman_lcw->p = init_p;//后验状态估计值误差的方差的初始值
+  kalman_lcw->A = 1;
+  kalman_lcw->H = 1;
+  kalman_lcw->q = 10;//预测（过程）噪声方差 实验发现修改这个值会影响收敛速率
+  kalman_lcw->r =30;//测量（观测）噪声方差
+  //这里两个参数是最关键的
+}
+
+/**
+*kalman_filter - 卡尔曼滤波器
+*@kalman_lcw:卡尔曼结构体
+*@measure；测量值
+*返回滤波后的值
+*/
+float kalman_filter_left(kalman_struct_left *kalman_lcw, float measure)
+{
+  /* Predict */
+  kalman_lcw->x = kalman_lcw->A * kalman_lcw->x;
+  kalman_lcw->p = kalman_lcw->A * kalman_lcw->A * kalman_lcw->p + kalman_lcw->q;  /* p(n|n-1)=A^2*p(n-1|n-1)+q */
+  
+  /* Measurement */
+  kalman_lcw->gain = kalman_lcw->p * kalman_lcw->H / (kalman_lcw->p * kalman_lcw->H * kalman_lcw->H + kalman_lcw->r);
+  kalman_lcw->x = kalman_lcw->x + kalman_lcw->gain * (measure - kalman_lcw->H * kalman_lcw->x);
+  kalman_lcw->p = (1 - kalman_lcw->gain * kalman_lcw->H) * kalman_lcw->p;
+  
+  return kalman_lcw->x;
+}
+/**
+*kalman_init - 卡尔曼滤波器初始化
+*@kalman_lcw：卡尔曼滤波器结构体
+*@init_x：待测量的初始值
+*@init_p：后验状态估计值误差的方差的初始值
+*/
+void kalman_init_right(kalman_struct_right *kalman_lcw, float init_x, float init_p)
+{
+  kalman_lcw->x = init_x;//待测量的初始值，如有中值一般设成中值
+  kalman_lcw->p = init_p;//后验状态估计值误差的方差的初始值
+  kalman_lcw->A = 1;
+  kalman_lcw->H = 1;
+  kalman_lcw->q = 10;//预测（过程）噪声方差 实验发现修改这个值会影响收敛速率
+  kalman_lcw->r = 30;//测量（观测）噪声方差
+  //这里两个参数是最关键的
+}
+
+/**
+*kalman_filter - 卡尔曼滤波器
+*@kalman_lcw:卡尔曼结构体
+*@measure；测量值
+*返回滤波后的值
+*/
+float kalman_filter_right(kalman_struct_right *kalman_lcw, float measure)
+{
+  /* Predict */
+  kalman_lcw->x = kalman_lcw->A * kalman_lcw->x;
+  kalman_lcw->p = kalman_lcw->A * kalman_lcw->A * kalman_lcw->p + kalman_lcw->q;  /* p(n|n-1)=A^2*p(n-1|n-1)+q */
+  
+  /* Measurement */
+  kalman_lcw->gain = kalman_lcw->p * kalman_lcw->H / (kalman_lcw->p * kalman_lcw->H * kalman_lcw->H + kalman_lcw->r);
+  kalman_lcw->x = kalman_lcw->x + kalman_lcw->gain * (measure - kalman_lcw->H * kalman_lcw->x);
+  kalman_lcw->p = (1 - kalman_lcw->gain * kalman_lcw->H) * kalman_lcw->p;
+  
+  return kalman_lcw->x;
+}
 
 /**********************液晶显示**************************************************/
 void lcd_display()
@@ -206,15 +308,18 @@ void dianjihuang()
 {
   //right
   FTM_CnV_REG(FTMN[FTM0],MOTOR4_PWM)=0;
-  FTM_CnV_REG(FTMN[FTM0],MOTOR1_PWM)=1500;
+  FTM_CnV_REG(FTMN[FTM0],MOTOR1_PWM)=0;
   //left
   FTM_CnV_REG(FTMN[FTM0],MOTOR2_PWM)=0;
-  FTM_CnV_REG(FTMN[FTM0],MOTOR3_PWM)=1500;
+  FTM_CnV_REG(FTMN[FTM0],MOTOR3_PWM)=0;
 }
 /*********************************主函数*****************************************************/
 void  main(void)
 {
+  
   initall();
+  kalman_init_left(&kalman_left,0,10000);
+  kalman_init_right(&kalman_right,0,10000);
   while(1)
   {
     processImage();
@@ -222,16 +327,74 @@ void  main(void)
     drawingMidLine();
     var[0] =val_right;
     var[1] =val_left;
-    var[2]=75;
-    var[3]=-75;
-     var[4]=zhidao_flag*100;
-    vcan_sendware((float *)var, sizeof(var));
-
-
-    //DELAY_MS(50);
+    //var[2] =val_right2;
+   // var[3] =val_left2;
+    var[2]=dianji_right_speed;
+    var[3]=-dianji_left_speed;
+    var[4]=zhidao_flag*100;
     
+    vcan_sendware((float *)var, sizeof(var));
+    
+    if(BZ==1)
+    { DisableInterrupts;
+    dianjihuang();
+    return;
+    //DELAY_MS(50);
+    }
   }
 }
+
+/*************************************舵机;由平均值计算出占空比**************************************/
+void duoji()
+{
+  float x = 0.0,sum=0.0,ave=0.0; ;
+  //舵机占空比
+  float KP;                                             //PD算法常量
+  float KD;
+  
+  static float duoji_last_error=0.0,duoji_error=0.0;             //中线平均偏差值
+  
+  if( zhidao_flag == 1&&BZ==0)
+  {
+    KP = 2.0 ;
+    KD = 4.0 ;
+  }
+  else if(BZ==1)
+  {
+    KP = 4.6 ;
+    KD = 5.2 ;
+  }
+  else
+  {
+    KP = 5.2 ;
+    KD = 6.9 ;
+  }
+  
+  for(int  s = i_max ; s >= i_min ; s-- )                   //计算均值
+  {
+    sum+=mid[s];
+    x++;
+  }
+  
+  ave=sum/x ;
+  sum=0 ;
+  
+  duoji_error=ave-mid_j ;                               //计算偏差
+  
+  duoji_duty=(uint16)(dj_mid+KP*duoji_error+KD*(duoji_error-duoji_last_error) ) ;   //dj;
+  duoji_last_error=duoji_error ;
+  
+  if(duoji_duty<dj_left_max)
+    duoji_duty=dj_left_max;
+  if(duoji_duty>dj_right_max)
+    duoji_duty=dj_right_max;
+  ftm_pwm_duty(FTM3 ,FTM_CH6,duoji_duty);                  //给舵机占空比  duoji_duty       1450
+  if( abs(duoji_duty-dj_mid) <= 35 )
+    zhidao_flag = 1 ;
+  else
+    zhidao_flag = 0 ;
+}
+
 
 /****************************baodi电机驱动**********************************/
 void dianji_baodi()
@@ -247,20 +410,45 @@ void dianji_baodi()
   }
   else
   {
-    V =50; A = 1.0 ;  B = 1.0 ;  K = 0.2 ;
+    V =75; A = 1.0 ;  B = 1.0 ;  K = 0.15 ;
   }
-  dianji_right_speed = (int)( A*V*( B+ K*(dj_mid-dj_mid)/70.0 ) );
-  dianji_left_speed  = (int)( A*V*( B- K*(dj_mid-dj_mid)/70.0 ) );
-  dianji_Right_baodi();
+  
+  
+  
+  SpeedKP_right=0;
+  SpeedKI_right=50;
+  SpeedKD_right=0;
+  
+  SpeedKP_left=0;
+  SpeedKI_left=50;
+  SpeedKD_left=0;
+  
+  
+  
+  dianji_right_speed = (int)( A*V*( B+ K*(duoji_duty-dj_mid)/70.0 ) );
+  dianji_left_speed  = (int)( A*V*( B- K*(duoji_duty-dj_mid)/70.0 ) );
   dianji_Left_baodi();
+  dianji_Right_baodi();
+  
   
 }
 
 void dianji_Left_baodi()
 {
-  SpeedKP_left=40;
-  SpeedKI_left=35;
-  SpeedKD_left=0;
+  //  if(zhidao_flag==1)
+  //  {
+  //    SpeedKP_left=0;
+  //    SpeedKI_left=65;
+  //    SpeedKD_left=0;
+  //  }
+  //  else
+  //  {
+  //    SpeedKP_left=25;
+  //    SpeedKI_left=5;
+  //    SpeedKD_left=0;
+  //  }
+  //  
+  
   left_E[2]=left_E[1];
   left_E[1]=left_E[0];
   left_E[0]=dianji_left_speed+val_left;
@@ -269,19 +457,30 @@ void dianji_Left_baodi()
     +SpeedKP_left*( left_E[0] - left_E[1])
       +SpeedKI_left*( left_E[0] )
         +SpeedKD_left*(left_E[0] - 2*left_E[1]+  left_E[2]);
-  if(left_speed>=2200)
-    left_speed=2200;
-  if(left_speed<=100)
-    left_speed=100;
+  if(left_speed>=1800)
+    left_speed=1800;
+  if(left_speed<=700)
+    left_speed=700;
   FTM_CnV_REG(FTMN[FTM0],MOTOR2_PWM)=(uint32)(left_speed);        
   FTM_CnV_REG(FTMN[FTM0],MOTOR3_PWM)=0;                       //   第二个电机驱动
+  
 }
 
 void dianji_Right_baodi()
 {
-  SpeedKP_right=40;
-  SpeedKI_right=35;
-  SpeedKD_right=0;
+  //  if(zhidao_flag==1)
+  //  {
+  //    SpeedKP_right=0;
+  //    SpeedKI_right=65;
+  //    SpeedKD_right=0;
+  //  }
+  //  else
+  //  {
+  //    SpeedKP_right=20;
+  //    SpeedKI_right=2.5;
+  //    SpeedKD_right=0;
+  //  }
+  
   right_E[2]=right_E[1];
   right_E[1]=right_E[0];
   right_E[0]=dianji_right_speed-val_right;
@@ -290,13 +489,13 @@ void dianji_Right_baodi()
     +SpeedKP_right*( right_E[0] - right_E[1])
       +SpeedKI_right*( right_E[0] )
         +SpeedKD_right*(right_E[0] - 2*right_E[1]+  right_E[2]);
-  if(right_speed>=2200)
-    right_speed=2200;
-  if(right_speed<=100)
-    right_speed=100;
-  FTM_CnV_REG(FTMN[FTM0],MOTOR4_PWM)=(uint32)right_speed;
+  if(right_speed>=1800)
+    right_speed=1800;
+  if(right_speed<=700)
+    right_speed=700;
   FTM_CnV_REG(FTMN[FTM0],MOTOR1_PWM)=0;
-
+  FTM_CnV_REG(FTMN[FTM0],MOTOR4_PWM)=(uint32)right_speed;
+  
   
 }
 
@@ -343,7 +542,7 @@ void  initall()
   NVIC_SetPriority(UART0_RX_TX_IRQn,2);
   NVIC_SetPriority(UART1_RX_TX_IRQn,3);   //配置优先级
   NVIC_SetPriority(PIT0_IRQn,4);          //配置优先级
-   NVIC_SetPriority(PIT0_IRQn,5);          //配置优先级
+  NVIC_SetPriority(PIT0_IRQn,5);          //配置优先级
   
   DisableInterrupts;
   EnableInterrupts;
@@ -354,13 +553,15 @@ void  initall()
 /********************************定时器中断0，编码器，电机，清中断***************************/
 void PIT0_IRQHandler()
 {
-  val_right =ftm_quad_get(FTM1);
-  val_left =ftm_quad_get(FTM2);
-  //dianjihuang();
-  dianji_baodi();
+  val_right=ftm_quad_get(FTM1);
+  val_left=ftm_quad_get(FTM2);
+  //val_right2 =kalman_filter_right(&kalman_right,val_right);
+  //val_left2 =kalman_filter_left(&kalman_left,val_left);
   TOF_1020();
   bizhang_time();
   duoji();
+  dianji_baodi();
+  //dianjihuang();
   ftm_quad_clean(FTM2);
   ftm_quad_clean(FTM1); 
   PIT_Flag_Clear(PIT0);       //清中断标志位
@@ -368,7 +569,7 @@ void PIT0_IRQHandler()
 
 void PIT1_IRQHandler()
 {
-
+  
   //vcan_sendware((float *)var, sizeof(var));
   PIT_Flag_Clear(PIT1);       //清中断标志位
 }
@@ -421,16 +622,16 @@ void uart1_test_handler(void)
     {
       switch(ucRxBuffer[1])
       {
-		  case 0x51:
-		  Acc[0] = ((unsigned short)ucRxBuffer[3]<<8)|ucRxBuffer[2];
-		  Acc[1] = ((unsigned short)ucRxBuffer[5]<<8)|ucRxBuffer[4];
-		  Acc[2] = ((unsigned short)ucRxBuffer[7]<<8)|ucRxBuffer[6];
-		  acc_x=(float)Acc[0]/32768*16*9.8+0.315;
-		  acc_y=(float)Acc[1]/32768*16*9.8-0.6;
-		  acc_z=(float)Acc[2]/32768*16*9.8;
-                 // getGyroDistance(acc_x);
-		  
-		  break;
+      case 0x51:
+        Acc[0] = ((unsigned short)ucRxBuffer[3]<<8)|ucRxBuffer[2];
+        Acc[1] = ((unsigned short)ucRxBuffer[5]<<8)|ucRxBuffer[4];
+        Acc[2] = ((unsigned short)ucRxBuffer[7]<<8)|ucRxBuffer[6];
+        acc_x=(float)Acc[0]/32768*16*9.8+0.315;
+        acc_y=(float)Acc[1]/32768*16*9.8-0.6;
+        acc_z=(float)Acc[2]/32768*16*9.8;
+        // getGyroDistance(acc_x);
+        
+        break;
       case 0x53:
         Angle[0] = ((unsigned short)ucRxBuffer[3]<<8)|ucRxBuffer[2];
         Angle[1] = ((unsigned short)ucRxBuffer[5]<<8)|ucRxBuffer[4];
@@ -438,7 +639,7 @@ void uart1_test_handler(void)
         angle_x=(float)(Angle[0]/32768.0*180);
         angle_y=(float)(Angle[1]/32768.0*180);
         angle_z=(float)(Angle[2]/32768.0*180);
-		break;
+        break;
       default:
         break;
         
@@ -455,12 +656,12 @@ void bizhang_time()
   if(BZ==1)
   {
     time+=0.01;
-    mid_j=47;
-    if(time>=0.10)mid_j=52;
-    if(time>=0.20)mid_j=55;
-    if(time>=0.25)mid_j=45;
-    if(time>=0.30)mid_j=32;
-    if(time>=0.40)
+    mid_j=50;
+    if(time>=0.10)mid_j=55;
+    if(time>=0.25)mid_j=50;
+    if(time>=0.30)mid_j=45;
+    if(time>=0.35)mid_j=32;
+    if(time>=0.45)
     {
       BZ=0;
       time=0;
@@ -519,7 +720,7 @@ void  processImage()
   img_extract((uint8 *)img,(uint8 *)imgbuff,CAMERA_SIZE);       //解压为二维数组
   //vcan_sendimg((uint8 *)imgbuff, sizeof(imgbuff));
   analyzeRoad();
- // findFlag();
+  //findFlag();
   getMidLine();
 }
 
@@ -555,7 +756,7 @@ void analyzeRoad()
         flag_R[i]=0;
       }
     }
-     if(mid[i] <= 0)     mid_back=1;
+    if(mid[i] <= 0)     mid_back=1;
     else if (mid[i] >= 79)    mid_back=78;
     else if(mid[i] > 0 && mid[i] < 79)   mid_back=mid[i];
     else  mid_back=40;
@@ -589,7 +790,7 @@ void findFlag()
 /*************************寻找中心线************************************/
 void  getMidLine()
 {
-   for(int i=i_max;i>=i_min;i--)
+  for(int i=i_max;i>=i_min;i--)
   {
     //左右都有
     if(flag_L[i]==1 && flag_R[i]==1)
@@ -622,67 +823,13 @@ void  getMidLine()
 /****************************障碍物判断****************************************/
 int getObstacleDistance()
 {
-   for(int i=i_max;i>=i_min-5;i--)
+  for(int i=i_max;i>=i_min-5;i--)
   {
     if(mid_R_line[i]<mid_R_line[i-2])
       return i;
   }
   return 0;
 }
-
-/*************************************舵机;由平均值计算出占空比**************************************/
-void duoji()
-{
-  float x = 0.0,sum=0.0,ave=0.0; ;
-  uint16 duoji_duty;                                    //舵机占空比
-  float KP;                                             //PD算法常量
-  float KD;
-  
-  static float duoji_last_error=0.0,duoji_error=0.0;             //中线平均偏差值
-
-  if( zhidao_flag == 1&&BZ==0)
-  {
-    KP = 1.6 ;
-    KD = 4.2 ;
-  }
-  else if(BZ==1)
-  {
-    KP = 3.6 ;
-    KD = 5.2 ;
-  }
-  else
-  {
-    KP = 5.2 ;
-    KD = 7.9 ;
-  }
-  
-  for(int  s = i_max ; s >= i_min ; s-- )                   //计算均值
-  {
-    sum+=mid[s];
-    x++;
-  }
-  
-  ave=sum/x ;
-  sum=0 ;
- 
-  duoji_error=ave-mid_j ;                               //计算偏差
-     if( abs(duoji_error) >= 5 )
-    zhidao_flag = 0 ;
-  else
-    zhidao_flag = 1 ;
-  duoji_duty=(uint16)(dj_mid+KP*duoji_error+KD*(duoji_error-duoji_last_error) ) ;   //dj;
-  
-  duoji_last_error=duoji_error ;
-  
-  if(duoji_duty<dj_left_max)
-    duoji_duty=dj_left_max;
-  if(duoji_duty>dj_right_max)
-    duoji_duty=dj_right_max;
-  ftm_pwm_duty(FTM3 ,FTM_CH6,duoji_duty);                  //给舵机占空比  duoji_duty       1450
-  
-}
-
-
 
 /**********************************画出中线**************************************/
 void drawingMidLine()
@@ -773,29 +920,29 @@ void DMA0_IRQHandler()
 /***************************************获取陀螺仪两次差值****************************************/
 float getGyroDate(float x1,float x2)
 {
-	float angle;
-	if(x1>=x2)
-	{
-		if(x1-x2>=180.0)
-			angle=360.0-(x1-x2);
-		else
-			angle=x2-x1;
-	}
-	else
-	{
-		if(x2-x1>=180.0)
-			angle=(x2-x1)-360.0;
-		else
-			angle=x2-x1;
-	}
-	return angle;
+  float angle;
+  if(x1>=x2)
+  {
+    if(x1-x2>=180.0)
+      angle=360.0-(x1-x2);
+    else
+      angle=x2-x1;
+  }
+  else
+  {
+    if(x2-x1>=180.0)
+      angle=(x2-x1)-360.0;
+    else
+      angle=x2-x1;
+  }
+  return angle;
 }
 
 float getGyroDistance(float a)
 {
-	gy_speed=gy_speed+a*0.01;
-	gy_distance=gy_distance+gy_speed*0.01;
-	return gy_distance;
+  gy_speed=gy_speed+a*0.01;
+  gy_distance=gy_distance+gy_speed*0.01;
+  return gy_distance;
 }
 /***************************************开根号***********************************************/
 
