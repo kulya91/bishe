@@ -230,12 +230,7 @@ void kalman_init(kalman_struct *kalman_lcw, float init_x, float init_p)
   kalman_lcw->r =60;//测量（观测）噪声方差
   //这里两个参数是最关键的
 }
-/**
-*kalman_filter - 卡尔曼滤波器
-*@kalman_lcw:卡尔曼结构体
-*@measure；测量值
-*返回滤波后的值
-*/
+
 float kalman_filter(kalman_struct *kalman_lcw, float measure)
 {
   /* Predict */
@@ -266,12 +261,7 @@ void kalman_init_left(kalman_struct_left *kalman_lcw, float init_x, float init_p
   kalman_lcw->r =60;//测量（观测）噪声方差
   //这里两个参数是最关键的
 }
-/**
-*kalman_filter - 卡尔曼滤波器
-*@kalman_lcw:卡尔曼结构体
-*@measure；测量值
-*返回滤波后的值
-*/
+
 float kalman_filter_left(kalman_struct_left *kalman_lcw, float measure)
 {
   /* Predict */
@@ -303,12 +293,7 @@ void kalman_init_right(kalman_struct_right *kalman_lcw, float init_x, float init
   //这里两个参数是最关键的
 }
 
-/**
-*kalman_filter - 卡尔曼滤波器
-*@kalman_lcw:卡尔曼结构体
-*@measure；测量值
-*返回滤波后的值
-*/
+
 float kalman_filter_right(kalman_struct_right *kalman_lcw, float measure)
 {
   /* Predict */
@@ -638,6 +623,7 @@ void PIT1_IRQHandler()
   //vcan_sendware((float *)var, sizeof(var));
   PIT_Flag_Clear(PIT1);       //清中断标志位
 }
+
 /********************************UART0蓝牙接收**********************************************/
 void uart0_test_handler(void)
 {
@@ -707,14 +693,11 @@ void uart1_test_handler(void)
         angle_y=(float)(Angle[1]/32768.0*180);
         angle_z=(float)(Angle[2]/32768.0*180);
        //angle_z2=kalman_filter(&kalman,angle_z);
-        
         break;
       default:
         break;
-        
       }
       ucRxCnt=0;
-      
     }
   }
 }
@@ -809,7 +792,7 @@ void  processImage()
 {
   camera_get_img();
   img_extract((uint8 *)img,(uint8 *)imgbuff,CAMERA_SIZE);       //解压为二维数组
-  vcan_sendimg((uint8 *)imgbuff, sizeof(imgbuff));
+  //vcan_sendimg((uint8 *)imgbuff, sizeof(imgbuff));
   analyzeRoad();
   //findFlag();
   getMidLine();
@@ -855,8 +838,8 @@ void analyzeRoad()
 }
 
 /************************************直道检测****************************************/
-//void findFlag()
-//{
+void findFlag()
+{
 //  uint8 daolu_i = 0 , daolu_Max = i_max , daolu_Min = i_min ;
 //  uint8 daolu_Mid_lose = 0;
 //  uint8 daolu_sum = 0 ;
@@ -869,9 +852,8 @@ void analyzeRoad()
 //        if()
 //      }
 //    }
-//      
-//    }
-// }
+//  }
+}
 
 /*************************寻找中心线************************************/
 void  getMidLine()
@@ -1003,7 +985,9 @@ void DMA0_IRQHandler()
 }
 
 /***************************************陀螺仪工具函数**************************************************/
+
 /***************************************获取陀螺仪两次差值****************************************/
+
 float getGyroDate(float xt,float xt_1)
 {
   float angle;
@@ -1027,7 +1011,7 @@ float getGyroDate(float xt,float xt_1)
 float getGyroDistance(float a)
 {
   gy_speed=(int)(val_right-val_left)/2.0/5;
-  gy_distance=gy_distance+gy_speed*a;
+  gy_distance=gy_distance+100*a;
   return gy_distance;
 }
 /***************************************开根号***********************************************/
