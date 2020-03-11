@@ -25,7 +25,7 @@ if not "%~1" == "" goto debugFile
 
 @echo on 
 
-"E:\aastudy\iar\common\bin\cspybat" -f "C:\Users\hhh\Desktop\毕设\程序\程序\Prj\IAR\settings\vcan_Kinetis.FN15_Debug.general.xcl" --backend -f "C:\Users\hhh\Desktop\毕设\程序\程序\Prj\IAR\settings\vcan_Kinetis.FN15_Debug.driver.xcl" 
+"E:\aastudy\iar\common\bin\cspybat" -f "D:\毕设\程序\程序\Prj\IAR\settings\vcan_Kinetis.FN15_Debug.general.xcl" --backend -f "D:\毕设\程序\程序\Prj\IAR\settings\vcan_Kinetis.FN15_Debug.driver.xcl" 
 
 @echo off 
 goto end 
@@ -34,7 +34,7 @@ goto end
 
 @echo on 
 
-"E:\aastudy\iar\common\bin\cspybat" -f "C:\Users\hhh\Desktop\毕设\程序\程序\Prj\IAR\settings\vcan_Kinetis.FN15_Debug.general.xcl" "--debug_file=%~1" --backend -f "C:\Users\hhh\Desktop\毕设\程序\程序\Prj\IAR\settings\vcan_Kinetis.FN15_Debug.driver.xcl" 
+"E:\aastudy\iar\common\bin\cspybat" -f "D:\毕设\程序\程序\Prj\IAR\settings\vcan_Kinetis.FN15_Debug.general.xcl" "--debug_file=%~1" --backend -f "D:\毕设\程序\程序\Prj\IAR\settings\vcan_Kinetis.FN15_Debug.driver.xcl" 
 
 @echo off 
 :end

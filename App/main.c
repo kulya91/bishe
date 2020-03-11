@@ -144,6 +144,7 @@ int var3[60];
 /********************************************避障模块*******************************************************/
 uint8 BZ=0;
 uint8 BZ2=0;
+uint8 BZ3=0;
 double time=0.0;
 
 /********TOF*********/
@@ -163,8 +164,8 @@ float angle_err;
 short Acc[3];
 float acc_x,acc_y,acc_z;
 float acc_x2,acc_y2,acc_z2;
-float gy_distance;
-float gy_speed;
+float gy_distance=0;
+float gy_speed=0;
 
 int count=0;
 /********************************************************函数声明模块*******************************************/
@@ -296,11 +297,10 @@ void kalman_init_right(kalman_struct_right *kalman_lcw, float init_x, float init
 
 float kalman_filter_right(kalman_struct_right *kalman_lcw, float measure)
 {
-  /* Predict */
+ 
   kalman_lcw->x = kalman_lcw->A * kalman_lcw->x;
-  kalman_lcw->p = kalman_lcw->A * kalman_lcw->A * kalman_lcw->p + kalman_lcw->q;  /* p(n|n-1)=A^2*p(n-1|n-1)+q */
+  kalman_lcw->p = kalman_lcw->A * kalman_lcw->A * kalman_lcw->p + kalman_lcw->q;
   
-  /* Measurement */
   kalman_lcw->gain = kalman_lcw->p * kalman_lcw->H / (kalman_lcw->p * kalman_lcw->H * kalman_lcw->H + kalman_lcw->r);
   kalman_lcw->x = kalman_lcw->x + kalman_lcw->gain * (measure - kalman_lcw->H * kalman_lcw->x);
   kalman_lcw->p = (1 - kalman_lcw->gain * kalman_lcw->H) * kalman_lcw->p;
@@ -326,7 +326,7 @@ void lcd_display()
   LCD_num(site,abs(val_right),FCOLOUR,BCOLOUR);
   site.y =70;
   LCD_num_C(site,length_val[0],FCOLOUR,BCOLOUR);
-  
+
   site.x =0;
   site.y =60;
   
@@ -360,6 +360,7 @@ void  main(void)
 {
   
   initall();
+  gy_distance=0;
   kalman_init_left(&kalman_left,0,10000);
   kalman_init_right(&kalman_right,0,10000);
   kalman_init(&kalman,0,10000);
@@ -368,16 +369,15 @@ void  main(void)
     processImage();
     lcd_display();      //lcd显示
     drawingMidLine();
-    var[0] =acc_y;
-    var[1] =acc_y2;
-    var[2] =val_left2;
-    var[3] =val_right2;
-    var[4]=gy_distance;
-    var[5]=angle_err;
-    var[6]=zhidao_flag*100;
-
-    vcan_sendware((float *)var, sizeof(var));
-    
+//    var[0] =angle_z;
+//    var[1] =angle_x;
+//    var[2] =angle_y;
+//    var[3] =acc_x;
+//    var[4]=0;
+//    var[5]=0;
+//    var[6]=0;
+//    vcan_sendware((float *)var, sizeof(var));
+//    
 //    if(BZ==1)
 //    { DisableInterrupts;
 //    dianjihuang();
@@ -424,15 +424,6 @@ void duoji()
   duoji_duty=(uint16)(dj_mid+KP*duoji_error+KD*(duoji_error-duoji_last_error) ) ;   //dj;
   duoji_last_error=duoji_error ;
   
-    left_E[2]=left_E[1];
-  left_E[1]=left_E[0];
-  left_E[0]=dianji_left_speed+val_left;
-  // left_E[0]=75+val_left;
-  left_speed=left_speed
-    +SpeedKP_left*( left_E[0] - left_E[1])
-      +SpeedKI_left*( left_E[0] )
-        +SpeedKD_left*(left_E[0] - 2*left_E[1]+  left_E[2]);
-  
   if(duoji_duty<dj_left_max)
     duoji_duty=dj_left_max;
   if(duoji_duty>dj_right_max)
@@ -472,10 +463,10 @@ void dianji_baodi()
   SpeedKI_left=50;
   SpeedKD_left=45;
   
-  
-  
+
   dianji_right_speed = (int)( A*V*( B+ K*(duoji_duty-dj_mid)/70.0 ) );
   dianji_left_speed  = (int)( A*V*( B- K*(duoji_duty-dj_mid)/70.0 ) );
+  
   dianji_Left_baodi();
   dianji_Right_baodi();
   
@@ -533,7 +524,6 @@ void dianji_Right_baodi()
   right_E[2]=right_E[1];
   right_E[1]=right_E[0];
   right_E[0]=dianji_right_speed-val_right;
-  //right_E[0]=75-val_right;
   right_speed=right_speed
     +SpeedKP_right*( right_E[0] - right_E[1])
       +SpeedKI_right*( right_E[0] )
@@ -640,16 +630,13 @@ void uart0_test_handler(void)
       }
       uart_getchar(UART0,&ch_2019[rxcnt++]);
       if(rxcnt>2)
-      {
-        
-        
+      { 
         if((ch_2019[rxcnt-1]=='m')&&(ch_2019[rxcnt-2]=='m'))//
         {
           rxcnt--;
           rxflag=1;
           uart_rx_irq_dis(UART0);
         }
-        
       }
     }
   }
@@ -677,9 +664,11 @@ void uart1_test_handler(void)
         Acc[0] = ((unsigned short)ucRxBuffer[3]<<8)|ucRxBuffer[2];
         Acc[1] = ((unsigned short)ucRxBuffer[5]<<8)|ucRxBuffer[4];
         Acc[2] = ((unsigned short)ucRxBuffer[7]<<8)|ucRxBuffer[6];
-        acc_x=(float)Acc[0]/32768*16*9.8+0.315;
-        acc_y=(float)Acc[1]/32768*16*9.8-0.4;
+        acc_x=(float)Acc[0]/32768*16*9.8;
+        acc_y=(float)Acc[1]/32768*16*9.8;
         acc_z=(float)Acc[2]/32768*16*9.8;
+        acc_x=acc_x-sin(angle_x)*9.8;
+        acc_y=acc_y-sin(angle_y)*9.8;
         // getGyroDistance(acc_x);
         acc_y2=kalman_filter(&kalman,acc_y);
         break;
@@ -709,7 +698,7 @@ void bizhang_time()
   if(BZ==1)
   {
           time+=0.01;
-      correctNum=-9;
+      correctNum=0;
     if(count==1)
     {
       BZ2=1;
@@ -728,11 +717,11 @@ void bizhang_time()
     else
     {
 
-      if(time>=0.13)correctNum=-15;
+      if(time>=0.13)correctNum=-5;
       if(time>=0.25)correctNum=-10;
-      if(time>=0.30)correctNum=0;
-      if(time>=0.35)correctNum=8;
-      if(time>=0.45)
+      if(time>=1.0)correctNum=0;
+      if(time>=1.45)correctNum=8;
+      if(time>=1.55)
       {
         BZ=0;
         BZ2=0;
@@ -776,7 +765,7 @@ void TOF_1020()
   }
   
   
-  if( length_val[0] <= 600 && length_val[0] >= 100 )
+  if( length_val[0] <= 450 && length_val[0] >= 100 )
   {
     if( BZ == 0 )       //不是在避障过程
     {
@@ -792,7 +781,7 @@ void  processImage()
 {
   camera_get_img();
   img_extract((uint8 *)img,(uint8 *)imgbuff,CAMERA_SIZE);       //解压为二维数组
-  //vcan_sendimg((uint8 *)imgbuff, sizeof(imgbuff));
+  vcan_sendimg((uint8 *)imgbuff, sizeof(imgbuff));
   analyzeRoad();
   //findFlag();
   getMidLine();
@@ -806,7 +795,7 @@ void analyzeRoad()
   {
     for(int j=mid_back;j>1;j--)                        //左边赛道
     {
-      if(img[i][j]==0xff && img[i][j-1]==0x00)
+      if(img[i][j]==0xff&&img[i][j-1]==0x00) //检测跳变点
       {
         mid_L_line[i]=j-1;
         flag_L[i]=1;
@@ -819,7 +808,7 @@ void analyzeRoad()
     }
     for(int j=mid_back;j<78;j++)                       //右边赛道
     {
-      if(img[i][j]==0xff && img[i][j+1]==0x00)
+      if(img[i][j]==0xff&&img[i][j+1]==0x00)
       {
         mid_R_line[i]=j+1;
         flag_R[i]=1;

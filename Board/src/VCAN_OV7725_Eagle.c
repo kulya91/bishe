@@ -42,7 +42,6 @@ static void ov7725_eagle_port_init();
  */
 uint8 ov7725_eagle_init(uint8 *imgaddr)           //鹰眼初始化
 {
-
     ov7725_eagle_img_buff = imgaddr;              //8进制图像地址赋值给图像缓存器
     while(ov7725_eagle_reg_init() == 0);          //寄存器初始化
     ov7725_eagle_port_init();                     //鹰眼管脚初始化
